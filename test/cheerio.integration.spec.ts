@@ -17,7 +17,7 @@ describe('CheerioCrawler Integration', () => {
   it('should cache and hit for standard GET requests', async () => {
     const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
 
-    server.setHandler('/hello', (req, res) => {
+    server.setHandler('/hello', async (req, res) => {
       res.header('Cache-Control', 'public, max-age=60');
       return { message: 'hello world' };
     });
@@ -66,7 +66,7 @@ describe('CheerioCrawler Integration', () => {
     const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
 
     let callCount = 0;
-    server.setHandler('/swr', (req, res) => {
+    server.setHandler('/swr', async (req, res) => {
       callCount++;
       res.header('Cache-Control', 'public, max-age=1, stale-while-revalidate=60');
       return { count: callCount };
@@ -130,7 +130,7 @@ describe('CheerioCrawler Integration', () => {
     const crawler = new CheerioCrawler({
       additionalMimeTypes: ['image/png'], // Important: allow CheerioCrawler to process images
       preNavigationHooks: [hook],
-      requestHandler: async ({ body, response }) => {
+      requestHandler: async ({ body, response }: any) => {
         bodies.push(body);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
@@ -150,7 +150,7 @@ describe('CheerioCrawler Integration', () => {
     const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
     let callCount = 0
 
-    server.setHandler('/error-resiliency', (req, res) => {
+    server.setHandler('/error-resiliency', async (req, res) => {
       callCount++;
       // Set SWR to 0 via header to ensure we test stale-if-error directly
       res.header('Cache-Control', 'public, max-age=1, stale-while-revalidate=0, stale-if-error=60');
@@ -195,9 +195,9 @@ describe('CheerioCrawler Integration', () => {
   it('should distinguish POST requests by their payload', async () => {
     const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
 
-    server.setHandler('/api/post', (req, res) => {
+    server.setHandler('/api/post', async (req, res) => {
       res.header('Cache-Control', 'public, max-age=60');
-      return { id: req.body.id };
+      return { id: (req.body as any).id };
     });
 
     const hook = createCrawleeCacheHook({ cache, config, activeCacheWrites });
