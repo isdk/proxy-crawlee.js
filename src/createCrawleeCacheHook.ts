@@ -4,8 +4,7 @@ import { CrawleeCacheOptions, CrawleeContext } from './types';
 import { crawleeToWebRequest } from './crawleeToWebRequest';
 import { webResponseToFulfill } from './webResponseToFulfill';
 import { defaultFetcher } from './defaultFetcher';
-import { gotResponseToWebResponse } from './gotResponseToWebResponse';
-import { webResponseToGotResponse } from './webResponseToGotResponse';
+import { setupHttpCrawlerCache } from './setupHttpCrawlerCache';
 
 const debug = debugFactory('@isdk/proxy:adapters:crawlee');
 
@@ -14,7 +13,7 @@ const debug = debugFactory('@isdk/proxy:adapters:crawlee');
  *
  * 该钩子实现了“环境自适应”：
  * 1. 如果检测到浏览器环境 (Playwright/Puppeteer)，会自动设置请求路由拦截。
- * 2. 如果检测到 HTTP 环境 (CheerioCrawler)，会自动向 gotOptions 注入拦截 handler。
+ * 2. 如果检测到 HTTP 环境 (CheerioCrawler)，会自动调用 setupHttpCrawlerCache。
  */
 export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
   const {
@@ -28,8 +27,8 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
   // 创建一个绑定的 fetchWithCache 实例，共享并发写入追踪
   const fetchWithCacheBound = createFetchWithCache(activeCacheWrites);
 
-  return async (context: CrawleeContext) => {
-    const { request: crawleeReq, page, gotOptions } = context;
+  return async (context: CrawleeContext, secondArg?: any) => {
+    const { request: crawleeReq, page, crawler } = context;
 
     if (page) {
       // --- 场景 A: 浏览器引擎 (Playwright/Puppeteer) ---
@@ -51,8 +50,8 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
           const response = await fetchWithCacheBound(
             webReq,
             async (innerReq) => {
-              if (options.fetcher) return options.fetcher(innerReq);
-              return defaultFetcher(innerReq);
+              const result = options.fetcher ? await options.fetcher(innerReq) : await defaultFetcher(innerReq);
+              return result;
             },
             { cache, config, backgroundUpdate }
           );
@@ -93,26 +92,10 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
         }
       }
 
-    } else if (gotOptions) {
-      // --- 场景 B: HTTP 引擎 (Cheerio/JSDOM) ---
-      debug('Injecting cache handler into gotOptions for: %s', crawleeReq.url);
-
-      gotOptions.handlers = gotOptions.handlers || [];
-      gotOptions.handlers.push(async (gotOpts: any, next: any) => {
-        const webReq = crawleeToWebRequest(crawleeReq);
-
-        const webRes = await fetchWithCacheBound(
-          webReq,
-          async () => {
-            if (options.fetcher) return options.fetcher(webReq);
-            const gotRes = await next(gotOpts);
-            return gotResponseToWebResponse(gotRes);
-          },
-          { cache, config, backgroundUpdate }
-        );
-
-        return webResponseToGotResponse(webRes);
-      });
+    } else if (crawler && !(crawler as any)._proxyWrapped) {
+      // --- 场景 B: HTTP 引擎 (CheerioCrawler/JSDOMCrawler) ---
+      // 用户指出在 Hook 中修改实例不够优雅，因此我们将其逻辑抽离到 setupHttpCrawlerCache
+      setupHttpCrawlerCache(crawler, options);
     }
   };
 }

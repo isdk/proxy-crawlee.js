@@ -36,4 +36,5 @@ export interface CrawleeContext {
   browserContext?: any;
   // CheerioCrawler 特有
   gotOptions?: any;
+  sendRequest: any;
 }

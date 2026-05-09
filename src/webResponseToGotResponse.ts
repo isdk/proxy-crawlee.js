@@ -1,20 +1,29 @@
+import { Readable } from 'node:stream';
+
 /**
  * 内部工具：标准 Web 响应转 Got 兼容对象
  * (用于拦截器从缓存返回模拟数据)
  */
 export async function webResponseToGotResponse(webRes: Response): Promise<any> {
-  const body = await webRes.arrayBuffer();
+  const buffer = Buffer.from(await webRes.arrayBuffer());
   const headers: Record<string, string> = {};
   webRes.headers.forEach((v, k) => {
     headers[k] = v;
   });
 
-  return {
+  // 构造一个可读流
+  const stream = Readable.from(buffer);
+
+  // 将 Got 响应所需的属性附加到流对象上
+  Object.assign(stream, {
+    url: webRes.url,
     statusCode: webRes.status,
+    statusMessage: webRes.statusText,
     headers,
-    body: Buffer.from(body),
-    rawBody: Buffer.from(body),
-    // 注入自定义属性以便调试
+    body: buffer,
+    rawBody: buffer,
     isFromCache: !!webRes.headers.get('x-proxy-cache') && webRes.headers.get('x-proxy-cache') !== 'MISS',
-  };
+  });
+
+  return stream;
 }
