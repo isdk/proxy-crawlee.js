@@ -254,46 +254,6 @@ describe('createCrawleeCacheHook', () => {
     expect(res.headers['x-proxy-cache']).toBe('STALE_IF_ERROR');
   });
 
-  it('应该支持 Puppeteer 风格的 setRequestInterception 拦截', async () => {
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response('puppeteer-data', { status: 200 }));
-    const hook = createCrawleeCacheHook({ cache, config: config.default, fetcher: mockFetcher });
-
-    const events: Record<string, Function> = {};
-    const mockPage = {
-      setRequestInterception: vi.fn(),
-      on: vi.fn().mockImplementation((event, cb) => { events[event] = cb; }),
-      once: vi.fn().mockImplementation((event, cb) => { events[`once:${event}`] = cb; }),
-      off: vi.fn()
-    };
-
-    const context = {
-      request: { url: 'https://puppeteer.com', method: 'GET' },
-      page: mockPage
-    };
-
-    await hook(context as any);
-
-    expect(mockPage.setRequestInterception).toHaveBeenCalledWith(true);
-    expect(mockPage.on).toHaveBeenCalledWith('request', expect.any(Function));
-
-    // 模拟 Puppeteer 的 Request 对象
-    const mockReq = {
-      url: () => 'https://puppeteer.com',
-      method: () => 'GET',
-      isNavigationRequest: () => true,
-      respond: vi.fn(),
-      continue: vi.fn()
-    };
-
-    // 触发请求事件
-    await events['request'](mockReq);
-
-    expect(mockReq.respond).toHaveBeenCalledWith(expect.objectContaining({
-      body: expect.any(Buffer)
-    }));
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
-  });
-
   it('应该在返回 STALE 后正确触发后台异步更新', async () => {
     const mockFetcher = vi.fn().mockImplementation(async () => new Response('new-data', {
       status: 200,

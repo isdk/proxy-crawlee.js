@@ -17,7 +17,7 @@ export interface CrawleeCacheOptions {
   backgroundUpdate?: boolean;
   /**
    * 是否只缓存主文档请求 (Navigation Requests)。
-   * 仅对 Playwright/Puppeteer 引擎生效。默认：true。
+   * 仅对 Playwright 引擎生效。默认：true。
    */
   navigationOnly?: boolean;
   /** 并发写入任务追踪器 */

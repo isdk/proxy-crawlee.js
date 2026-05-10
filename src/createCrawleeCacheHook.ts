@@ -14,7 +14,7 @@ const INTERCEPTED_PAGES = new WeakSet<any>();
  * 创建一个通用的 Crawlee 缓存钩子，可用于 preNavigationHooks。
  *
  * 该钩子实现了“环境自适应”：
- * 1. 如果检测到浏览器环境 (Playwright/Puppeteer)，会自动设置请求路由拦截。
+ * 1. 如果检测到 Playwright 环境，会自动设置请求路由拦截。
  * 2. 如果检测到 HTTP 环境 (CheerioCrawler)，会自动调用 setupHttpCrawlerCache。
  */
 export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
@@ -33,7 +33,7 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
     const { request: crawleeReq, page, crawler } = context;
 
     if (page) {
-      // --- 场景 A: 浏览器引擎 (Playwright/Puppeteer) ---
+      // --- 场景 A: 浏览器引擎 (Playwright) ---
       // 确保每个页面只设置一次拦截，避免重复注册导致的内存泄漏和逻辑混乱
       if (INTERCEPTED_PAGES.has(page)) {
         return;
@@ -44,16 +44,14 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
       const interceptor = async (route: any) => {
         try {
-          const req = typeof route.request === 'function' ? route.request() : route;
-          const url = typeof req.url === 'function' ? req.url() : req.url;
+          const req = route.request();
+          const url = req.url();
 
-          const isNavigation = typeof req.isNavigationRequest === 'function'
-            ? req.isNavigationRequest()
-            : (typeof req.resourceType === 'function' ? req.resourceType() === 'document' : false);
+          const isNavigation = req.isNavigationRequest();
 
           if (navigationOnly && !isNavigation) {
             debug('Skipping non-navigation request: %s', url);
-            return typeof route.continue === 'function' ? route.continue() : undefined;
+            return route.continue();
           }
 
           debug('Intercepting request: %s', url);
@@ -89,11 +87,11 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
           );
 
           const fulfillOptions = await webResponseToFulfill(response);
-          return typeof route.fulfill === 'function' ? route.fulfill(fulfillOptions) : (route as any).respond(fulfillOptions);
+          return route.fulfill(fulfillOptions);
         } catch (error) {
           debug('Cache interception failed for browser, continuing: %o', error);
           try {
-            return typeof route.continue === 'function' ? route.continue() : undefined;
+            return route.continue();
           } catch (e) {
             debug('Failed to call route.continue: %o', e);
           }
@@ -103,15 +101,6 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
       if (typeof page.route === 'function') {
         // Playwright: 使用通配符拦截所有请求，过滤逻辑在 interceptor 内部
         await page.route('**/*', interceptor);
-      }
-      else if (typeof page.setRequestInterception === 'function') {
-        // Puppeteer
-        try {
-          await page.setRequestInterception(true);
-          page.on('request', interceptor);
-        } catch (e) {
-          debug('Failed to set Puppeteer interception: %o', e);
-        }
       }
 
     } else if (crawler && !(crawler as any)._proxyWrapped) {

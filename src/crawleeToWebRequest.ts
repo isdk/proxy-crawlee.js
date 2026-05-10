@@ -1,5 +1,5 @@
 /**
- * 将 Crawlee 的 Request 对象或浏览器 (Playwright/Puppeteer) 的 Request 对象转换为标准的 Web Request
+ * 将 Crawlee 的 Request 对象或浏览器 (Playwright) 的 Request 对象转换为标准的 Web Request
  */
 export function crawleeToWebRequest(request: any): Request {
   const url = typeof request.url === 'function' ? request.url() : request.url;

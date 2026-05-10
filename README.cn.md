@@ -4,7 +4,7 @@
 
 ## 核心特性
 
-- **🚀 通用 Hook 设计**：只需一个 `preNavigationHooks` 即可同时适配 `CheerioCrawler`、`PlaywrightCrawler` 和 `PuppeteerCrawler`。
+- **🚀 通用 Hook 设计**：只需一个 `preNavigationHooks` 即可同时适配 `CheerioCrawler` 和 `PlaywrightCrawler`。
 - **🧠 环境自适应**：自动识别当前的爬虫引擎（浏览器或 HTTP），并应用最有效的拦截策略。
 - **🛡️ 请求合并 (Request Collapsing)**：在高并发抓取场景下，确保针对同一 URL 的重复请求只会被执行一次，彻底防止缓存击穿。
 - **🌊 原生流式缓存**：支持大数据量响应的流式写入磁盘，避免大 HTML 文档导致的内存溢出 (OOM)。
@@ -71,9 +71,9 @@ await crawler.run(['https://example.com']);
 
 适配器会向 `gotOptions.handlers` 注入一个拦截处理器。它在 Got 请求生命周期的最底层进行干预，如果缓存命中，将直接返回模拟的响应对象，从而完全跳过网络 I/O。
 
-### Playwright / Puppeteer (浏览器引擎)
+### Playwright (浏览器引擎)
 
-适配器利用 `page.route` (Playwright) 或 `setRequestInterception` (Puppeteer) 拦截请求。通过将主文档请求重定向到 `fetchWithCache` 逻辑中，实现从缓存直接 `fulfill` 页面内容，绕过浏览器的网络栈。
+适配器利用 `page.route` (Playwright) 拦截请求。通过将主文档请求重定向到 `fetchWithCache` 逻辑中，实现从缓存直接 `fulfill` 页面内容，绕过浏览器的网络栈。
 
 ## 许可证
 

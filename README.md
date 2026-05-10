@@ -4,7 +4,7 @@ A caching adapter for [Crawlee](https://crawlee.dev/) that integrates the `@isdk
 
 ## Features
 
-- **🚀 Universal Hook**: Use a single `preNavigationHooks` for both `CheerioCrawler` and `BrowserCrawler` (Playwright/Puppeteer).
+- **🚀 Universal Hook**: Use a single `preNavigationHooks` for both `CheerioCrawler` and `PlaywrightCrawler`.
 - **🧠 Environment-Aware**: Automatically detects the crawler engine and applies the most efficient interception strategy.
 - **🛡️ Request Collapsing**: Prevents cache stampede in high-concurrency scraping sessions.
 - **🌊 Native Streaming**: Efficiently caches large documents without high memory overhead.
@@ -65,9 +65,9 @@ await crawler.run(['https://example.com']);
 
 The adapter injects a custom handler into `gotOptions.handlers`. It intercepts the request at the lowest level, preventing `got-scraping` from making a network call if a cache hit occurs.
 
-### Playwright / Puppeteer (Browser)
+### Playwright (Browser)
 
-The adapter uses `page.route` (Playwright) or `setRequestInterception` (Puppeteer) to intercept navigation requests. It fulfills the request directly from the cache, bypassing the browser's network stack for the main document.
+The adapter uses `page.route` (Playwright) to intercept navigation requests. It fulfills the request directly from the cache, bypassing the browser's network stack for the main document.
 
 ## License
 
