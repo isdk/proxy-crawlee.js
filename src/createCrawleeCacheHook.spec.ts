@@ -25,26 +25,41 @@ describe('createCrawleeCacheHook', () => {
   });
 
   it('应该支持 Cheerio 环境下的拦截', async () => {
-    const mockFetcher = vi.fn().mockResolvedValue(new Response('hello', { status: 200 }));
-    const hook = createCrawleeCacheHook({ cache, config: config.default, fetcher: mockFetcher });
+    // 模拟 CheerioCrawler 的原始请求函数（返回 Got 格式响应）
+    const mockOriginalRequest = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'content-type': 'text/plain' },
+      body: Buffer.from('original-response'),
+      url: 'https://cheerio.com'
+    });
+
+    const mockCrawler = {
+      _requestFunction: mockOriginalRequest
+    };
+
+    const hook = createCrawleeCacheHook({ cache, config: config.default });
 
     const context = {
       request: { url: 'https://cheerio.com', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
 
     await hook(context as any);
-    expect(context.gotOptions.handlers.length).toBe(1);
 
-    const handler: any = context.gotOptions.handlers[0];
-    const res = await handler({}, vi.fn());
+    // 验证 crawler 被包装
+    expect(mockCrawler._proxyWrapped).toBe(true);
 
-    expect(res.body.toString()).toBe('hello');
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    // 调用被包装后的 _requestFunction
+    const res = await mockCrawler._requestFunction({ request: context.request });
+
+    expect(res.body.toString()).toBe('original-response');
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
 
     // 再次请求应命中缓存
-    await handler({}, vi.fn());
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    const res2 = await mockCrawler._requestFunction({ request: context.request });
+    expect(res2.isFromCache).toBe(true);
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1); // 原始请求只被调用一次
   });
 
   it('应该支持 Playwright 环境下的拦截', async () => {
@@ -61,7 +76,8 @@ describe('createCrawleeCacheHook', () => {
     };
 
     await hook(context as any);
-    expect(mockPage.route).toHaveBeenCalledWith('https://playwright.com', expect.any(Function));
+    // Playwright 使用通配符 '**/*' 拦截所有请求，URL 过滤在 interceptor 内部处理
+    expect(mockPage.route).toHaveBeenCalledWith('**/*', expect.any(Function));
 
     const mockRoute = {
       request: () => ({
@@ -80,34 +96,43 @@ describe('createCrawleeCacheHook', () => {
 
   it('应该支持并发请求合并 (Request Coalescing)', async () => {
     const activeCacheWrites = new Map<string, Promise<void>>();
-    const mockFetcher = vi.fn().mockImplementation(async () => {
+
+    // 模拟延迟的原始请求函数
+    const mockOriginalRequest = vi.fn().mockImplementation(async () => {
       await new Promise(r => setTimeout(r, 50));
-      return new Response('coalesced', { status: 200 });
+      return {
+        statusCode: 200,
+        statusMessage: 'OK',
+        headers: { 'content-type': 'text/plain' },
+        body: Buffer.from('coalesced'),
+        url: 'https://coalesce.com'
+      };
     });
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
 
     const hook = createCrawleeCacheHook({
       cache,
       config: config.default,
-      fetcher: mockFetcher,
       activeCacheWrites
     });
 
     const context = {
       request: { url: 'https://coalesce.com', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
 
     await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
+    // 并发调用两次 _requestFunction
     const [r1, r2] = await Promise.all([
-      handler({}, vi.fn()),
-      handler({}, vi.fn())
+      mockCrawler._requestFunction({ request: context.request }),
+      mockCrawler._requestFunction({ request: context.request })
     ]);
 
     expect(r1.body.toString()).toBe('coalesced');
     expect(r2.body.toString()).toBe('coalesced');
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1); // 只调用一次（合并）
   });
 
   it('当 navigationOnly 为 true 时，不应拦截静态资源请求', async () => {
@@ -169,53 +194,68 @@ describe('createCrawleeCacheHook', () => {
   });
 
   it('应该支持 POST 请求的缓存 (通过 Payload 生成指纹)', async () => {
-    const mockFetcher = vi.fn().mockImplementation(async (req) => {
-      const text = await req.text();
-      return new Response(`response-for-${text}`, { status: 200 });
+    // 模拟 POST 请求的原始请求函数
+    const mockOriginalRequest = vi.fn().mockImplementation(async (opts) => {
+      const payload = opts.request.payload;
+      return {
+        statusCode: 200,
+        statusMessage: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: Buffer.from(`response-for-${JSON.stringify(payload)}`),
+        url: 'https://post-cache.com'
+      };
     });
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
 
     // 配置支持 POST 缓存
     const postConfig = { methods: ['GET', 'POST'], forceCache: true };
-    const hook = createCrawleeCacheHook({ cache, config: postConfig, fetcher: mockFetcher });
+    const hook = createCrawleeCacheHook({ cache, config: postConfig });
 
     const context = {
       request: {
         url: 'https://post-cache.com',
         method: 'POST',
-        payload: { id: 123 } // 对象格式 Payload
+        payload: { id: 123 }
       },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
 
     await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
     // 第一次请求
-    const res1 = await handler({}, vi.fn());
+    const res1 = await mockCrawler._requestFunction({ request: context.request });
     expect(res1.body.toString()).toBe('response-for-{"id":123}');
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
 
     // 第二次请求 (相同的 Payload)
-    const res2 = await handler({}, vi.fn());
+    const res2 = await mockCrawler._requestFunction({ request: context.request });
     expect(res2.body.toString()).toBe('response-for-{"id":123}');
     expect(res2.isFromCache).toBe(true);
-    expect(mockFetcher).toHaveBeenCalledTimes(1); // 命中缓存
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1); // 命中缓存
   });
 
   it('应该支持 stale-if-error 容灾', async () => {
     const errorConfig = { methods: ['GET'], staleIfError: true };
-    const hook = createCrawleeCacheHook({ cache, config: errorConfig });
 
     const request = { url: 'https://stale.com', method: 'GET', headers: {} };
-    const context = {
-      request,
-      gotOptions: { handlers: [] }
-    };
 
-    await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
+    // 1. 先创建一个能成功返回的 crawler，存入过期缓存
+    const mockOriginalRequestSuccess = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'cache-control': 'public, max-age=1', 'content-type': 'text/plain' },
+      body: Buffer.from('old-data'),
+      url: request.url
+    });
 
-    // 1. 获取正确的 Cache Key 并先成功请求一次，存入缓存（已过期）
+    const mockCrawlerSuccess = { _requestFunction: mockOriginalRequestSuccess };
+    const hookSuccess = createCrawleeCacheHook({ cache, config: errorConfig });
+    const contextSuccess = { request, crawler: mockCrawlerSuccess };
+    await hookSuccess(contextSuccess as any);
+    await mockCrawlerSuccess._requestFunction({ request });
+
+    // 2. 获取正确的 Cache Key 并手动设置过期
     const webReq = new Request(request.url, { method: request.method });
     const cacheKey = await generateCacheKey(webReq, errorConfig);
 
@@ -223,9 +263,8 @@ describe('createCrawleeCacheHook', () => {
       { url: request.url, method: 'GET', headers: {} },
       { status: 200, headers: { 'cache-control': 'public, max-age=1' } }
     );
-    // 强制设置过期时间到过去
     const policyObj = policy.toObject();
-    policyObj.t = Date.now() - 10000;
+    policyObj.t = Date.now() - 10000; // 强制设为已过期
 
     await cache.set(cacheKey, Buffer.from('old-data'), {
       status: 200,
@@ -236,56 +275,62 @@ describe('createCrawleeCacheHook', () => {
       policy: policyObj
     } as any);
 
-    // 2. 模拟 Fetcher 失败，且关闭 backgroundUpdate 以确保同步进入错误处理
-    const mockFetcher = vi.fn().mockRejectedValue(new Error('Site Down'));
-    const hookWithError = createCrawleeCacheHook({
+    // 3. 创建会失败的 crawler，关闭 backgroundUpdate 以确保同步进入错误处理
+    const mockOriginalRequestFail = vi.fn().mockRejectedValue(new Error('Site Down'));
+    const mockCrawlerFail = { _requestFunction: mockOriginalRequestFail };
+    const hookFail = createCrawleeCacheHook({
       cache,
       config: errorConfig,
-      fetcher: mockFetcher,
       backgroundUpdate: false
     });
-    await hookWithError(context as any);
-    const handlerWithError: any = context.gotOptions.handlers[1];
+    const contextFail = { request, crawler: mockCrawlerFail };
+    await hookFail(contextFail as any);
 
-    // 3. 执行请求，应触发 stale-if-error 返回旧数据
-    const res = await handlerWithError({}, vi.fn());
+    // 4. 执行请求，应触发 stale-if-error 返回旧数据
+    const res = await mockCrawlerFail._requestFunction({ request });
     expect(res.body.toString()).toBe('old-data');
     expect(res.statusCode).toBe(200);
     expect(res.headers['x-proxy-cache']).toBe('STALE_IF_ERROR');
   });
 
   it('应该在返回 STALE 后正确触发后台异步更新', async () => {
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response('new-data', {
-      status: 200,
-      headers: { 'cache-control': 'public, max-age=3600' } // 确保更新后的数据是新鲜的
-    }));
     const activeCacheWrites = new Map<string, Promise<void>>();
+
+    // 模拟会返回新数据的原始请求函数
+    const mockOriginalRequest = vi.fn().mockImplementation(async () => ({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'cache-control': 'public, max-age=3600', 'content-type': 'text/plain' },
+      body: Buffer.from('new-data'),
+      url: 'https://swr.com'
+    }));
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
+
     const hook = createCrawleeCacheHook({
       cache,
       config: config.default,
-      fetcher: mockFetcher,
       backgroundUpdate: true,
       activeCacheWrites
     });
 
     const request = { url: 'https://swr.com', method: 'GET', headers: {} };
-    const context = { request, gotOptions: { handlers: [] } };
+    const context = { request, crawler: mockCrawler };
     await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
     // 预设一个已过期的缓存
     const webReq = new Request(request.url);
     const cacheKey = await generateCacheKey(webReq, config.default);
     const policy = new CachePolicy({ url: request.url, method: 'GET', headers: {} }, { status: 200, headers: { 'cache-control': 'public, max-age=1' } });
     const policyObj = policy.toObject();
-    policyObj.t = Date.now() - 5000; // 强制设为 5 秒前
+    policyObj.t = Date.now() - 5000;
 
     await cache.set(cacheKey, Buffer.from('old-data'), {
       status: 200, headers: {}, url: request.url, method: 'GET', timestamp: Date.now() - 5000, policy: policyObj
     } as any);
 
     // 执行请求，应立即返回 STALE
-    const res = await handler({}, vi.fn());
+    const res = await mockCrawler._requestFunction({ request });
     expect(res.body.toString()).toBe('old-data');
     expect(res.headers['x-proxy-cache']).toBe('STALE');
 
@@ -293,10 +338,10 @@ describe('createCrawleeCacheHook', () => {
     await new Promise(r => setTimeout(r, 20));
     await Promise.all(activeCacheWrites.values());
 
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
 
     // 再次请求，应该拿到更新后的数据 (HIT)
-    const res2 = await handler({}, vi.fn());
+    const res2 = await mockCrawler._requestFunction({ request });
     expect(res2.body.toString()).toBe('new-data');
     expect(res2.headers['x-proxy-cache']).toBe('HIT');
   });
@@ -306,131 +351,166 @@ describe('createCrawleeCacheHook', () => {
       methods: ['GET'],
       query: { exclude: ['timestamp'] }
     };
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response('data', { status: 200 }));
-    const hook = createCrawleeCacheHook({ cache, config: configWithExclude, fetcher: mockFetcher });
+
+    // 模拟原始请求函数 - 用于被 hook 包装后的 crawler
+    const mockOriginalRequest = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'content-type': 'text/plain' },
+      body: Buffer.from('data'),
+      url: 'https://query.com'
+    });
+
+    // 创建一个 mock crawler
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
+    const hook = createCrawleeCacheHook({ cache, config: configWithExclude });
 
     // 第一个请求带 timestamp=1
     const context1 = {
       request: { url: 'https://query.com?id=1&timestamp=1', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
     await hook(context1 as any);
-    const handler1: any = context1.gotOptions.handlers[0];
-    await handler1({}, vi.fn());
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    await mockCrawler._requestFunction({ request: context1.request });
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
 
-    // 第二个请求带 timestamp=2 (应该 HIT)
+    // 第二个请求带 timestamp=2 (排除 timestamp 后 URL 相同，应该命中缓存)
+    // 不需要新的 crawler，hook 已经包装了 mockCrawler
     const context2 = {
       request: { url: 'https://query.com?id=1&timestamp=2', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
     await hook(context2 as any);
-    const handler2: any = context2.gotOptions.handlers[0];
-    const res2 = await handler2({}, vi.fn());
+    const res2 = await mockCrawler._requestFunction({ request: context2.request });
 
-    expect(res2.isFromCache).toBe(true);
-    expect(mockFetcher).toHaveBeenCalledTimes(1); // 依然只有 1 次调用
+    // 原始请求仍只被调用 1 次，因为第二次请求命中缓存
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
+    // 响应应该有缓存标记
+    expect(res2.headers['x-proxy-cache']).toBe('HIT');
   });
 
   it('应该能够正确处理并缓存重定向响应 (301)', async () => {
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response(null, {
-      status: 301,
-      headers: { 'Location': 'https://target.com' }
-    }));
-    const hook = createCrawleeCacheHook({ cache, config: config.default, fetcher: mockFetcher });
+    // 模拟返回 301 重定向的原始请求函数
+    const mockOriginalRequest = vi.fn().mockResolvedValue({
+      statusCode: 301,
+      statusMessage: 'Moved Permanently',
+      headers: { 'location': 'https://target.com', 'content-type': 'text/html' },
+      body: Buffer.from('Redirecting...'),
+      url: 'https://source.com'
+    });
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
+    const hook = createCrawleeCacheHook({ cache, config: config.default });
 
     const context = {
       request: { url: 'https://source.com', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
-    await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
-    const res = await handler({}, vi.fn());
+    await hook(context as any);
+
+    const res = await mockCrawler._requestFunction({ request: context.request });
     expect(res.statusCode).toBe(301);
     expect(res.headers['location']).toBe('https://target.com');
 
     // 第二次请求应 HIT
-    const res2 = await handler({}, vi.fn());
+    const res2 = await mockCrawler._requestFunction({ request: context.request });
     expect(res2.isFromCache).toBe(true);
     expect(res2.statusCode).toBe(301);
   });
 
   it('应该能够正确处理并缓存二进制内容 (如图片)', async () => {
     const binaryData = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]); // PNG header
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response(binaryData, {
-      status: 200,
-      headers: { 'Content-Type': 'image/png' }
-    }));
-    const hook = createCrawleeCacheHook({ cache, config: config.default, fetcher: mockFetcher });
+
+    // 模拟返回二进制数据的原始请求函数
+    const mockOriginalRequest = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'content-type': 'image/png' },
+      body: binaryData,
+      url: 'https://image.com/logo.png'
+    });
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
+    const hook = createCrawleeCacheHook({ cache, config: config.default });
 
     const context = {
       request: { url: 'https://image.com/logo.png', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
-    await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
-    const res = await handler({}, vi.fn());
+    await hook(context as any);
+
+    const res = await mockCrawler._requestFunction({ request: context.request });
     expect(res.body).toEqual(binaryData);
     expect(res.headers['content-type']).toBe('image/png');
 
     // 命中缓存验证
-    const res2 = await handler({}, vi.fn());
+    const res2 = await mockCrawler._requestFunction({ request: context.request });
     expect(res2.isFromCache).toBe(true);
     expect(res2.body).toEqual(binaryData);
   });
 
   it('在并发请求合并时，如果网络请求失败，所有等待者都应收到错误', async () => {
     const activeCacheWrites = new Map<string, Promise<void>>();
-    const mockFetcher = vi.fn().mockImplementation(async () => {
+
+    // 模拟会失败的原始请求函数
+    const mockOriginalRequest = vi.fn().mockImplementation(async () => {
       await new Promise(r => setTimeout(r, 50));
       throw new Error('Network Down');
     });
 
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
     const hook = createCrawleeCacheHook({
       cache,
       config: config.default,
-      fetcher: mockFetcher,
       activeCacheWrites
     });
 
     const context = {
       request: { url: 'https://fail.com', method: 'GET' },
-      gotOptions: { handlers: [] }
+      crawler: mockCrawler
     };
+
     await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
     // 发起两个并发请求
-    const p1 = handler({}, vi.fn());
-    const p2 = handler({}, vi.fn());
+    const p1 = mockCrawler._requestFunction({ request: context.request });
+    const p2 = mockCrawler._requestFunction({ request: context.request });
 
     await expect(p1).rejects.toThrow('Network Down');
     await expect(p2).rejects.toThrow('Network Down');
 
-    // 确保底层 fetcher 只被调用了一次
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    // 确保原始请求只被调用了一次
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
   });
 
   it('应该支持后台更新的并发合并，防止多个并发请求触发重复的后台刷新', async () => {
-    const mockFetcher = vi.fn().mockImplementation(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      return new Response('new-data', { status: 200, headers: { 'cache-control': 'public, max-age=3600' } });
-    });
     const activeCacheWrites = new Map<string, Promise<void>>();
+
+    // 模拟会返回新数据的原始请求函数
+    const mockOriginalRequest = vi.fn().mockImplementation(async () => {
+      await new Promise(r => setTimeout(r, 50));
+      return {
+        statusCode: 200,
+        statusMessage: 'OK',
+        headers: { 'cache-control': 'public, max-age=3600', 'content-type': 'text/plain' },
+        body: Buffer.from('new-data'),
+        url: 'https://swr-coalesce.com'
+      };
+    });
+
+    const mockCrawler = { _requestFunction: mockOriginalRequest };
     const hook = createCrawleeCacheHook({
       cache,
       config: config.default,
-      fetcher: mockFetcher,
       backgroundUpdate: true,
       activeCacheWrites
     });
 
     const request = { url: 'https://swr-coalesce.com', method: 'GET' };
-    const context = { request, gotOptions: { handlers: [] } };
+    const context = { request, crawler: mockCrawler };
     await hook(context as any);
-    const handler: any = context.gotOptions.handlers[0];
 
     // 预设已过期缓存
     const webReq = new Request(request.url);
@@ -444,8 +524,8 @@ describe('createCrawleeCacheHook', () => {
 
     // 同时发起两个并发请求，它们都应该命中 STALE
     const [res1, res2] = await Promise.all([
-      handler({}, vi.fn()),
-      handler({}, vi.fn())
+      mockCrawler._requestFunction({ request }),
+      mockCrawler._requestFunction({ request })
     ]);
 
     expect(res1.headers['x-proxy-cache']).toBe('STALE');
@@ -455,8 +535,8 @@ describe('createCrawleeCacheHook', () => {
     await new Promise(r => setTimeout(r, 20));
     await Promise.all(activeCacheWrites.values());
 
-    // 关键断言：即使有两个 STALE 请求，后台 fetcher 应该只被调用一次
-    expect(mockFetcher).toHaveBeenCalledTimes(1);
+    // 关键断言：即使有两个 STALE 请求，原始请求函数应该只被调用一次
+    expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
   });
 
   it('应该遵循 cacheRules 规则，正确忽略不符合条件的请求', async () => {
@@ -466,22 +546,31 @@ describe('createCrawleeCacheHook', () => {
         { path: '/api/**' } // 仅缓存 /api 路径
       ]
     };
-    const mockFetcher = vi.fn().mockImplementation(async () => new Response('data', { status: 200 }));
-    const hook = createCrawleeCacheHook({ cache, config: configWithRules, fetcher: mockFetcher });
+
+    // 模拟原始请求函数
+    const mockOriginalRequest = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'content-type': 'text/plain' },
+      body: Buffer.from('data'),
+      url: 'https://site.com'
+    });
+
+    const hook = createCrawleeCacheHook({ cache, config: configWithRules });
 
     // 请求 /home (不应缓存)
-    const context1 = { request: { url: 'https://site.com/home', method: 'GET' }, gotOptions: { handlers: [] } };
+    const mockCrawler1 = { _requestFunction: mockOriginalRequest };
+    const context1 = { request: { url: 'https://site.com/home', method: 'GET' }, crawler: mockCrawler1 };
     await hook(context1 as any);
-    const handler1: any = context1.gotOptions.handlers[0];
-    const res1 = await handler1({}, vi.fn());
+    const res1 = await mockCrawler1._requestFunction({ request: context1.request });
     expect(res1.isFromCache).toBeFalsy();
     expect(res1.headers['x-proxy-cache']).toBeUndefined(); // 根本没进入缓存流程
 
     // 请求 /api/user (应缓存)
-    const context2 = { request: { url: 'https://site.com/api/user', method: 'GET' }, gotOptions: { handlers: [] } };
+    const mockCrawler2 = { _requestFunction: mockOriginalRequest };
+    const context2 = { request: { url: 'https://site.com/api/user', method: 'GET' }, crawler: mockCrawler2 };
     await hook(context2 as any);
-    const handler2: any = context2.gotOptions.handlers[0];
-    const res2 = await handler2({}, vi.fn());
+    const res2 = await mockCrawler2._requestFunction({ request: context2.request });
     expect(res2.headers['x-proxy-cache']).toBe('MISS');
   });
 });
