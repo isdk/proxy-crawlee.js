@@ -8,6 +8,8 @@ import { setupHttpCrawlerCache } from './setupHttpCrawlerCache';
 
 const debug = debugFactory('@isdk/proxy:adapters:crawlee');
 
+const INTERCEPTED_PAGES = new WeakSet<any>();
+
 /**
  * 创建一个通用的 Crawlee 缓存钩子，可用于 preNavigationHooks。
  *
@@ -32,26 +34,56 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
     if (page) {
       // --- 场景 A: 浏览器引擎 (Playwright/Puppeteer) ---
-      debug('Setting up browser cache interception for: %s', crawleeReq.url);
+      // 确保每个页面只设置一次拦截，避免重复注册导致的内存泄漏和逻辑混乱
+      if (INTERCEPTED_PAGES.has(page)) {
+        return;
+      }
+      INTERCEPTED_PAGES.add(page);
+
+      debug('Setting up browser cache interception for page');
 
       const interceptor = async (route: any) => {
         try {
           const req = typeof route.request === 'function' ? route.request() : route;
+          const url = typeof req.url === 'function' ? req.url() : req.url;
 
           const isNavigation = typeof req.isNavigationRequest === 'function'
             ? req.isNavigationRequest()
-            : (req.resourceType() === 'document' || req.isNavigationRequest());
+            : (typeof req.resourceType === 'function' ? req.resourceType() === 'document' : false);
 
           if (navigationOnly && !isNavigation) {
+            debug('Skipping non-navigation request: %s', url);
             return typeof route.continue === 'function' ? route.continue() : undefined;
           }
 
-          const webReq = crawleeToWebRequest(crawleeReq);
+          debug('Intercepting request: %s', url);
+
+          const webReq = crawleeToWebRequest(req);
           const response = await fetchWithCacheBound(
             webReq,
             async (innerReq) => {
-              const result = options.fetcher ? await options.fetcher(innerReq) : await defaultFetcher(innerReq);
-              return result;
+              if (options.fetcher) return options.fetcher(innerReq);
+
+              // 如果是 Playwright 环境，优先使用 route.fetch() 以前往真实网络抓取内容
+              // 这样可以复用浏览器的上下文（Cookie、会话等）
+              if (typeof route.fetch === 'function') {
+                try {
+                  debug('Using Playwright route.fetch() for: %s', innerReq.url);
+                  const playwrightRes = await route.fetch();
+                  const headers = playwrightRes.headers();
+                  // 移除一些可能导致冲突的 hop-by-hop 头部（可选，但通常 Playwright 会处理）
+                  
+                  return new Response(await playwrightRes.body(), {
+                    status: playwrightRes.status(),
+                    statusText: playwrightRes.statusText(),
+                    headers: headers,
+                  });
+                } catch (e) {
+                  debug('Playwright route.fetch() failed, falling back to default fetcher: %o', e);
+                }
+              }
+
+              return defaultFetcher(innerReq);
             },
             { cache, config, backgroundUpdate }
           );
@@ -69,24 +101,14 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
       };
 
       if (typeof page.route === 'function') {
-        await page.route(crawleeReq.url, interceptor);
+        // Playwright: 使用通配符拦截所有请求，过滤逻辑在 interceptor 内部
+        await page.route('**/*', interceptor);
       }
       else if (typeof page.setRequestInterception === 'function') {
+        // Puppeteer
         try {
           await page.setRequestInterception(true);
-          const handler = async (req: any) => {
-            if (req.url() === crawleeReq.url) {
-              await interceptor(req);
-            } else {
-              try {
-                await req.continue();
-              } catch (e) {
-                debug('Failed to continue non-target request: %o', e);
-              }
-            }
-          };
-          page.on('request', handler);
-          page.once('response', () => page.off('request', handler));
+          page.on('request', interceptor);
         } catch (e) {
           debug('Failed to set Puppeteer interception: %o', e);
         }
@@ -94,7 +116,6 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
     } else if (crawler && !(crawler as any)._proxyWrapped) {
       // --- 场景 B: HTTP 引擎 (CheerioCrawler/JSDOMCrawler) ---
-      // 用户指出在 Hook 中修改实例不够优雅，因此我们将其逻辑抽离到 setupHttpCrawlerCache
       setupHttpCrawlerCache(crawler, options);
     }
   };

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { CheerioCrawler } from 'crawlee';
+import { CheerioCrawler, Configuration } from 'crawlee';
 import { createCrawleeCacheHook } from '../src/createCrawleeCacheHook';
 import { setupIntegrationContext, IntegrationTestContext } from './helpers/integration-utils';
 
@@ -47,7 +47,11 @@ describe('CheerioCrawler Integration', () => {
       failedRequestHandler: async ({ request, error }) => {
         console.error(`Request ${request.url} failed:`, error);
       }
-    });
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: ctx.storagePath,
+      },
+    }));
 
     // First request: MISS
     await crawler.run([`${server.address}/hello`]);
@@ -89,7 +93,11 @@ describe('CheerioCrawler Integration', () => {
         counts.push(data.count);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    });
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: ctx.storagePath,
+      },
+    }));
 
     // 1. First request: MISS
     await crawler.run([`${server.address}/swr`]);
@@ -134,7 +142,11 @@ describe('CheerioCrawler Integration', () => {
         bodies.push(body);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    });
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: ctx.storagePath,
+      },
+    }));
 
     await crawler.run([`${server.address}/image.png`]);
     await awaitCache();
@@ -173,7 +185,11 @@ describe('CheerioCrawler Integration', () => {
         expect(data.status).toBe('ok');
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    });
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: ctx.storagePath,
+      },
+    }));
 
     // 1. Success first to populate cache
     await crawler.run([`${server.address}/error-resiliency`]);
@@ -211,7 +227,11 @@ describe('CheerioCrawler Integration', () => {
         ids.push(data.id);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    });
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: ctx.storagePath,
+      },
+    }));
 
     // Request with ID 1
     await crawler.run([{
