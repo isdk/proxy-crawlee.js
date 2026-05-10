@@ -25,7 +25,7 @@ export function setupHttpCrawlerCache(crawler: any, options: CrawleeCacheOptions
   const fetchWithCacheBound = createFetchWithCache(activeCacheWrites);
   const originalRequestFunction = (crawler as any)._requestFunction.bind(crawler);
 
-  (crawler as any)._requestFunction = async (opts: any) => {
+  (crawler as any)._requestFunction = async function(opts: any) {
     // opts 结构: { request, session, proxyUrl, gotOptions }
     const webReq = crawleeToWebRequest({ ...opts.request, ...opts.gotOptions });
 

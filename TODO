@@ -1,2 +1,3 @@
-- [ ] 暂不支持 Puppeteer.
+feat:
+  ☐ 暂不支持 Puppeteer.
     - 理由: Puppeteer 没有 `route.fetch` (类似于 Playwright 的功能), 使用 `setRequestInterception` 拦截并模拟请求时非常容易陷入死循环, 且难以优雅地实现与 Playwright 一致的缓存拦截逻辑.
