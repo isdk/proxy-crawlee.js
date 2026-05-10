@@ -34,7 +34,7 @@ describe('createCrawleeCacheHook', () => {
       url: 'https://cheerio.com'
     });
 
-    const mockCrawler = {
+    const mockCrawler: any = {
       _requestFunction: mockOriginalRequest
     };
 
