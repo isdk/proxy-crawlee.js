@@ -30,7 +30,7 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
   const fetchWithCacheBound = createFetchWithCache(activeCacheWrites);
 
   return async (context: CrawleeContext, secondArg?: any) => {
-    const { request: crawleeReq, page, crawler } = context;
+    const { page, crawler } = context;
 
     if (page) {
       // --- 场景 A: 浏览器引擎 (Playwright) ---
@@ -70,7 +70,7 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
                   const playwrightRes = await route.fetch();
                   const headers = playwrightRes.headers();
                   // 移除一些可能导致冲突的 hop-by-hop 头部（可选，但通常 Playwright 会处理）
-                  
+
                   return new Response(await playwrightRes.body(), {
                     status: playwrightRes.status(),
                     statusText: playwrightRes.statusText(),
