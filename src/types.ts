@@ -1,4 +1,4 @@
-import type { SiteCacheConfig, SmartCache } from '@isdk/proxy';
+import type { ProxySiteConfig, SmartCache } from '@isdk/proxy';
 
 /**
  * Crawlee 缓存适配器配置选项
@@ -7,7 +7,7 @@ export interface CrawleeCacheOptions {
   /** SmartCache 实例 */
   cache: SmartCache;
   /** 站点级缓存配置 */
-  config: SiteCacheConfig;
+  config: ProxySiteConfig;
   /**
    * 自定义 Fetcher。
    * 如果不提供，且在 HTTP 环境下，将默认尝试使用 `got-scraping`。

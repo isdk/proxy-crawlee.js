@@ -53,7 +53,7 @@ await crawler.run(['https://example.com']);
 | Option | Type | Description |
 | :--- | :--- | :--- |
 | `cache` | `SmartCache` | **Required**. The SmartCache instance from `@isdk/proxy`. |
-| `config` | `SiteCacheConfig` | **Required**. Cache rules and fingerprinting settings from `@isdk/proxy`. |
+| `config` | `ProxySiteConfig` | **Required**. Cache rules and fingerprinting settings from `@isdk/proxy`. |
 | `fetcher` | `Function` | Optional. Custom fetcher for real network requests. Defaults to `got-scraping`. |
 | `backgroundUpdate` | `boolean` | Enable SWR (Stale-While-Revalidate). Default: `true`. |
 | `navigationOnly` | `boolean` | Only cache the main document (Browser only). Default: `true`. |

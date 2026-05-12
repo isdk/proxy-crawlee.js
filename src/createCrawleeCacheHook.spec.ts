@@ -349,7 +349,7 @@ describe('createCrawleeCacheHook', () => {
   it('应该支持 query 排除逻辑，确保随机参数不影响缓存指纹', async () => {
     const configWithExclude = {
       methods: ['GET'],
-      query: { exclude: ['timestamp'] }
+      query: ['!timestamp'],
     };
 
     // 模拟原始请求函数 - 用于被 hook 包装后的 crawler
@@ -539,10 +539,10 @@ describe('createCrawleeCacheHook', () => {
     expect(mockOriginalRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('应该遵循 cacheRules 规则，正确忽略不符合条件的请求', async () => {
+  it('应该遵循 cache rules 规则，正确忽略不符合条件的请求', async () => {
     const configWithRules = {
       methods: ['GET'],
-      cacheRules: [
+      rules: [
         { path: '/api/**' } // 仅缓存 /api 路径
       ]
     };

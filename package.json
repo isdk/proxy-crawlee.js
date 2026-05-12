@@ -39,8 +39,8 @@
     "debug": "^4.4.3"
   },
   "peerDependencies": {
-    "@isdk/proxy": "*",
-    "crawlee": "*"
+    "@isdk/proxy": ">=0.2",
+    "crawlee": ">=3.16"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.7.3",

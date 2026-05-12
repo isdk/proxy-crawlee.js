@@ -1,4 +1,4 @@
-import { SmartCache, SiteCacheConfig } from '@isdk/proxy';
+import { SmartCache, ProxySiteConfig } from '@isdk/proxy';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -9,7 +9,7 @@ export interface IntegrationTestContext {
   storagePath: string;
   activeCacheWrites: Map<string, Promise<void>>;
   server: TestServer;
-  config: SiteCacheConfig;
+  config: ProxySiteConfig;
   awaitCache: () => Promise<void>;
   cleanup: () => Promise<void>;
 }

@@ -30,7 +30,8 @@ import { CheerioCrawler } from 'crawlee';
 // 1. 初始化 SmartCache 实例
 const cache = new SmartCache({
   storagePath: './.cache',
-  maxMemorySize: 1024 * 1024 // 1MB 以上的文件转储磁盘
+  maxMemorySize: 1024 * 1024, // 设定文件内容如果不大于 1MB 则可缓存于LRU内存，否则内存仅缓存文件的metadata.
+  maxTotalMemorySize: 100 * 1024 * 1024, // 设定LRU内存的最大容量
 });
 
 // 2. 创建缓存 Hook
@@ -59,7 +60,7 @@ await crawler.run(['https://example.com']);
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `cache` | `SmartCache` | **必填**。来自 `@isdk/proxy` 的 SmartCache 实例。 |
-| `config` | `SiteCacheConfig` | **必填**。来自 `@isdk/proxy` 的缓存策略配置（如 `methods`, `cacheRules`, `forceCache` 等）。 |
+| `config` | `ProxySiteConfig` | **必填**。来自 `@isdk/proxy` 的缓存策略配置（如 `methods`, `rules`, `forceCache` 等）。 |
 | `fetcher` | `Function` | 可选。自定义真实网络请求函数。默认为内置的 `got-scraping` 封装。 |
 | `backgroundUpdate` | `boolean` | 是否启用 SWR 后台异步更新。默认：`true`。 |
 | `navigationOnly` | `boolean` | 是否仅缓存主文档导航请求（仅对浏览器引擎生效）。默认：`true`。 |
