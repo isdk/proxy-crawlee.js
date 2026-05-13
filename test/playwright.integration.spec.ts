@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PlaywrightCrawler, Configuration } from 'crawlee';
+import path from 'path';
 import { createCrawleeCacheHook } from '../src/createCrawleeCacheHook';
 import { setupIntegrationContext, IntegrationTestContext } from './helpers/integration-utils';
 
@@ -38,29 +39,31 @@ describe('PlaywrightCrawler Integration', () => {
 
     const x_proxy_caches: string[] = []
 
-    const crawler = new PlaywrightCrawler({
+    const crawlerOptions = {
       launchContext: { launchOptions: { headless: true } },
       preNavigationHooks: [hook],
-      requestHandler: async ({ response }) => {
+      requestHandler: async ({ response }: any) => {
         x_proxy_caches.push(response?.headers()['x-proxy-cache'] as string);
         // Just wait a bit to ensure script would have been loaded
         await new Promise(r => setTimeout(r, 500));
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
-    // First run: MISS for html, script should be fetched normally
-    await crawler.run([`${server.address}/index.html`]);
+    // First run: MISS for html
+    const crawler1 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'nav-1') },
+    }));
+    await crawler1.run([`${server.address}/index.html`]);
     expect(server.requests.some(r => r.url === '/index.html')).toBe(true);
     expect(server.requests.some(r => r.url === '/script.js')).toBe(true);
     await awaitCache();
 
     // Second run: HIT for html, script should STILL be fetched from server (navigationOnly: true)
     server.clear();
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler2 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'nav-2') },
+    }));
+    await crawler2.run([`${server.address}/index.html`]);
 
     expect(server.requests.some(r => r.url === '/index.html')).toBe(false);
     expect(server.requests.some(r => r.url === '/script.js')).toBe(true);
@@ -91,25 +94,27 @@ describe('PlaywrightCrawler Integration', () => {
 
     const x_proxy_caches: string[] = []
 
-    const crawler = new PlaywrightCrawler({
+    const crawlerOptions = {
       launchContext: { launchOptions: { headless: true } },
       preNavigationHooks: [hook],
-      requestHandler: async ({ response }) => {
+      requestHandler: async ({ response }: any) => {
         x_proxy_caches.push(response?.headers()['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // First run
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler1 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'all-1') },
+    }));
+    await crawler1.run([`${server.address}/index.html`]);
     await awaitCache();
 
     // Second run
     server.clear();
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler2 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'all-2') },
+    }));
+    await crawler2.run([`${server.address}/index.html`]);
 
     // Both should be HIT (but requestHandler only sees the main document response)
     expect(server.requests.some(r => r.url === '/index.html')).toBe(false);
@@ -143,7 +148,7 @@ describe('PlaywrightCrawler Integration', () => {
       },
     }, new Configuration({
       storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
+        localDataDirectory: path.join(ctx.storagePath, 'fail-1'),
       },
     }));
 
@@ -174,27 +179,29 @@ describe('PlaywrightCrawler Integration', () => {
 
     const x_proxy_caches: string[] = []
 
-    const crawler = new PlaywrightCrawler({
+    const crawlerOptions = {
       launchContext: { launchOptions: { headless: true } },
       preNavigationHooks: [hook],
-      requestHandler: async ({ response, request }) => {
+      requestHandler: async ({ response }: any) => {
         x_proxy_caches.push(response?.headers()['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // Run both in one go
-    await crawler.run([`${server.address}/page1`, `${server.address}/page2`]);
+    const crawler1 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'seq-1') },
+    }));
+    await crawler1.run([`${server.address}/page1`, `${server.address}/page2`]);
     await awaitCache();
     expect(x_proxy_caches).toStrictEqual(['MISS', 'MISS']);
 
     // Second run: both should HIT
     server.clear();
     x_proxy_caches.length = 0;
-    await crawler.run([`${server.address}/page1`, `${server.address}/page2`]);
+    const crawler2 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'seq-2') },
+    }));
+    await crawler2.run([`${server.address}/page1`, `${server.address}/page2`]);
     expect(x_proxy_caches).toStrictEqual(['HIT', 'HIT']);
     expect(server.requests.length).toBe(0);
   });
@@ -220,29 +227,31 @@ describe('PlaywrightCrawler Integration', () => {
       navigationOnly: false
     });
 
-    const crawler = new PlaywrightCrawler({
+    const crawlerOptions = {
       launchContext: { launchOptions: { headless: true } },
       preNavigationHooks: [hook],
-      requestHandler: async ({ page }) => {
+      requestHandler: async ({ page }: any) => {
         // Wait for fetch to complete
         await page.waitForFunction(() => (window as any).data !== undefined);
         const data = await page.evaluate(() => (window as any).data);
         expect(data.status).toBe('ok');
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // First run
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler1 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'xhr-1') },
+    }));
+    await crawler1.run([`${server.address}/index.html`]);
     await awaitCache();
     expect(server.requests.some(r => r.url === '/api/data')).toBe(true);
 
     // Second run
     server.clear();
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler2 = new PlaywrightCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'xhr-2') },
+    }));
+    await crawler2.run([`${server.address}/index.html`]);
     expect(server.requests.some(r => r.url === '/api/data')).toBe(false);
   });
 
@@ -270,20 +279,19 @@ describe('PlaywrightCrawler Integration', () => {
       backgroundUpdate: true
     });
 
-    const crawler = new PlaywrightCrawler({
-      launchContext: { launchOptions: { headless: true } },
-      preNavigationHooks: [hook],
-      requestHandler: async ({ page }) => {
-        await page.waitForFunction(() => (window as any).count !== undefined);
-      },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    const requestHandler = async ({ page }: any) => {
+      await page.waitForFunction(() => (window as any).count !== undefined);
+    };
 
     // 1. First run: MISS
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler1 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-sub-1') },
+    }));
+    await crawler1.run([`${server.address}/index.html`]);
     await awaitCache();
     expect(apiCalls).toBe(1);
 
@@ -291,7 +299,14 @@ describe('PlaywrightCrawler Integration', () => {
     await new Promise(r => setTimeout(r, 1200));
 
     // 3. Second run: Should return STALE (count 1) and trigger background update
-    await crawler.run([`${server.address}/index.html`]);
+    const crawler2 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-sub-2') },
+    }));
+    await crawler2.run([`${server.address}/index.html`]);
     
     await awaitCache(); // Wait for background update
     expect(apiCalls).toBe(2); // One for first run, one for background revalidation
@@ -306,9 +321,7 @@ describe('PlaywrightCrawler Integration', () => {
           counts.push(await page.evaluate(() => (window as any).count));
         },
       }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-sub-3') },
     }));
 
     await crawler3.run([`${server.address}/index.html`]);
@@ -345,25 +358,25 @@ describe('PlaywrightCrawler Integration', () => {
       navigationOnly: false
     });
 
-    const crawler = new PlaywrightCrawler({
+    const requestHandler = async ({ page }: any) => {
+      const res1 = await page.evaluate(() => (window as any).doPost(1));
+      const res2 = await page.evaluate(() => (window as any).doPost(2));
+      const res3 = await page.evaluate(() => (window as any).doPost(1)); // Should HIT
+
+      expect(res1.id).toBe(1);
+      expect(res2.id).toBe(2);
+      expect(res3.id).toBe(1);
+    };
+
+    const crawler1 = new PlaywrightCrawler({
       launchContext: { launchOptions: { headless: true } },
       preNavigationHooks: [hook],
-      requestHandler: async ({ page }) => {
-        const res1 = await page.evaluate(() => (window as any).doPost(1));
-        const res2 = await page.evaluate(() => (window as any).doPost(2));
-        const res3 = await page.evaluate(() => (window as any).doPost(1)); // Should HIT
-
-        expect(res1.id).toBe(1);
-        expect(res2.id).toBe(2);
-        expect(res3.id).toBe(1);
-      },
+      requestHandler,
     }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'post-p1') },
     }));
 
-    await crawler.run([`${server.address}/index.html`]);
+    await crawler1.run([`${server.address}/index.html`]);
     await awaitCache();
 
     // Verify server received 2 unique POSTs
@@ -390,28 +403,34 @@ describe('PlaywrightCrawler Integration', () => {
       activeCacheWrites
     });
 
-    const crawler = new PlaywrightCrawler({
-      launchContext: { launchOptions: { headless: true } },
-      preNavigationHooks: [hook],
-      requestHandler: async ({ page, response }) => {
-        expect(response?.url()).toContain('/new-path');
-        expect(await page.content()).toContain('Redirected Content');
-      },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    const requestHandler = async ({ page, response }: any) => {
+      expect(response?.url()).toContain('/new-path');
+      expect(await page.content()).toContain('Redirected Content');
+    };
 
     // First run: MISS
-    await crawler.run([`${server.address}/old-path`]);
+    const crawler1 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'red-1') },
+    }));
+    await crawler1.run([`${server.address}/old-path`]);
     await awaitCache();
     expect(server.requests.some(r => r.url === '/old-path')).toBe(true);
     expect(server.requests.some(r => r.url === '/new-path')).toBe(true);
 
     // Second run: HIT for both (or at least the final one)
     server.clear();
-    await crawler.run([`${server.address}/old-path`]);
+    const crawler2 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'red-2') },
+    }));
+    await crawler2.run([`${server.address}/old-path`]);
     expect(server.requests.length).toBe(0);
   });
 
@@ -446,10 +465,85 @@ describe('PlaywrightCrawler Integration', () => {
       },
     }, new Configuration({
       storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
+        localDataDirectory: path.join(ctx.storagePath, 'cookie-1'),
       },
     }));
 
     await crawler.run([`${server.address}/set-cookie`]);
+  });
+
+  it('should cache multiple calls in the same session via page.goto', async () => {
+    const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
+
+    server.setHandler('/page-a', (req, res) => {
+      res.header('Content-Type', 'text/html');
+      res.header('Cache-Control', 'public, max-age=60');
+      res.header('Date', new Date().toUTCString());
+      res.send('<html><body><h1>Page A</h1></body></html>');
+    });
+
+    server.setHandler('/page-b', (req, res) => {
+      res.header('Content-Type', 'text/html');
+      res.header('Cache-Control', 'public, max-age=60');
+      res.header('Date', new Date().toUTCString());
+      res.send('<html><body><h1>Page B</h1></body></html>');
+    });
+
+    const hook = createCrawleeCacheHook({ 
+      cache, 
+      config, 
+      activeCacheWrites,
+      backgroundUpdate: false
+    });
+    const results: any[] = [];
+
+    const requestHandler = async ({ page, response, request }: any) => {
+      if (request.url.endsWith('/page-a')) {
+        const cacheA = response?.headers()['x-proxy-cache'];
+
+        // Manual navigation to page-b
+        const responseB = await page.goto(`${server.address}/page-b`);
+        const cacheB = responseB?.headers()['x-proxy-cache'];
+
+        results.push({ cacheA, cacheB });
+      }
+    };
+
+    const crawlerConfig1 = new Configuration({
+      persistStorage: false,
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'p-multi-1') },
+    });
+
+    const crawler1 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, crawlerConfig1);
+
+    // First run
+    await crawler1.run([`${server.address}/page-a`]);
+    await awaitCache();
+
+    // Second run
+    const crawlerConfig2 = new Configuration({
+      persistStorage: false,
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'p-multi-2') },
+    });
+
+    const crawler2 = new PlaywrightCrawler({
+      launchContext: { launchOptions: { headless: true } },
+      preNavigationHooks: [hook],
+      requestHandler,
+    }, crawlerConfig2);
+    await crawler2.run([`${server.address}/page-a`]);
+
+    expect(results).toHaveLength(2);
+    expect(results[0].cacheA).toBe('MISS');
+    expect(results[0].cacheB).toBe('MISS');
+    expect(results[1].cacheA).toBe('HIT');
+    expect(results[1].cacheB).toBe('HIT');
+
+    expect(server.requests.filter(r => r.url === '/page-a')).toHaveLength(1);
+    expect(server.requests.filter(r => r.url === '/page-b')).toHaveLength(1);
   });
 });

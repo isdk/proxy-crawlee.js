@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CheerioCrawler, Configuration } from 'crawlee';
+import path from 'path';
 import { createCrawleeCacheHook } from '../src/createCrawleeCacheHook';
 import { setupIntegrationContext, IntegrationTestContext } from './helpers/integration-utils';
 
@@ -49,7 +50,7 @@ describe('CheerioCrawler Integration', () => {
       }
     }, new Configuration({
       storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
+        localDataDirectory: path.join(ctx.storagePath, 'main_crawler'),
       },
     }));
 
@@ -60,7 +61,19 @@ describe('CheerioCrawler Integration', () => {
     await awaitCache(); // Ensure written to disk/cache
 
     // Second request: HIT
-    await crawler.run([`${server.address}/hello`]);
+    const crawler2 = new CheerioCrawler({
+      preNavigationHooks: [hook],
+      requestHandler: async ({ body, response }) => {
+        const data = JSON.parse(body.toString());
+        resDatas.push(data.message)
+        x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string)
+      },
+    }, new Configuration({
+      storageClientOptions: {
+        localDataDirectory: path.join(ctx.storagePath, 'main_crawler_2'),
+      },
+    }));
+    await crawler2.run([`${server.address}/hello`]);
     expect(server.requests.length).toBe(1); // Should not have reached server again
     expect(x_proxy_caches).toStrictEqual(['MISS', 'HIT'])
     expect(resDatas).toStrictEqual(['hello world', 'hello world'])
@@ -86,21 +99,20 @@ describe('CheerioCrawler Integration', () => {
     const x_proxy_caches: string[] = []
     const counts: number[] = []
 
-    const crawler = new CheerioCrawler({
+    const crawlerOptions = {
       preNavigationHooks: [hook],
-      requestHandler: async ({ body, response }) => {
+      requestHandler: async ({ body, response }: any) => {
         const data = JSON.parse(body.toString());
         counts.push(data.count);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // 1. First request: MISS
-    await crawler.run([`${server.address}/swr`]);
+    const crawler1 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-1') },
+    }));
+    await crawler1.run([`${server.address}/swr`]);
     expect(server.requests.length).toBe(1);
     await awaitCache();
 
@@ -108,13 +120,19 @@ describe('CheerioCrawler Integration', () => {
     await new Promise(r => setTimeout(r, 1100));
 
     // 3. Second request: Should return STALE and trigger background update
-    await crawler.run([`${server.address}/swr`]);
+    const crawler2 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-2') },
+    }));
+    await crawler2.run([`${server.address}/swr`]);
 
     await awaitCache(); // Ensure background update to finish
     expect(server.requests.length).toBe(2); // MISS(1) + Revalidate(1)
 
     // 4. Third request: Should be HIT with new data
-    await crawler.run([`${server.address}/swr`]);
+    const crawler3 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'swr-3') },
+    }));
+    await crawler3.run([`${server.address}/swr`]);
     expect(server.requests.length).toBe(2);
 
     expect(x_proxy_caches).toStrictEqual(['MISS', 'STALE', 'HIT']);
@@ -135,22 +153,25 @@ describe('CheerioCrawler Integration', () => {
     const x_proxy_caches: string[] = []
     const bodies: Buffer[] = []
 
-    const crawler = new CheerioCrawler({
+    const crawlerOptions = {
       additionalMimeTypes: ['image/png'], // Important: allow CheerioCrawler to process images
       preNavigationHooks: [hook],
       requestHandler: async ({ body, response }: any) => {
         bodies.push(body);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
-    await crawler.run([`${server.address}/image.png`]);
+    const crawler1 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'img-1') },
+    }));
+    await crawler1.run([`${server.address}/image.png`]);
     await awaitCache();
-    await crawler.run([`${server.address}/image.png`]);
+
+    const crawler2 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'img-2') },
+    }));
+    await crawler2.run([`${server.address}/image.png`]);
 
     expect(server.requests.length).toBe(1);
     expect(x_proxy_caches).toStrictEqual(['MISS', 'HIT']);
@@ -178,21 +199,20 @@ describe('CheerioCrawler Integration', () => {
 
     const x_proxy_caches: string[] = []
 
-    const crawler = new CheerioCrawler({
+    const crawlerOptions = {
       preNavigationHooks: [hook],
-      requestHandler: async ({ body, response }) => {
+      requestHandler: async ({ body, response }: any) => {
         const data = JSON.parse(body.toString());
         expect(data.status).toBe('ok');
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // 1. Success first to populate cache
-    await crawler.run([`${server.address}/error-resiliency`]);
+    const crawler1 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'err-1') },
+    }));
+    await crawler1.run([`${server.address}/error-resiliency`]);
     await awaitCache();
 
     // 2. Wait for max-age to expire
@@ -202,7 +222,10 @@ describe('CheerioCrawler Integration', () => {
     await server.close();
 
     // 4. Request should still succeed using stale cache via stale-if-error
-    await crawler.run([`${server.address}/error-resiliency`]);
+    const crawler2 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'err-2') },
+    }));
+    await crawler2.run([`${server.address}/error-resiliency`]);
 
     expect(x_proxy_caches).toStrictEqual(['MISS', 'STALE_IF_ERROR']);
     expect(callCount).toBe(1);
@@ -220,21 +243,20 @@ describe('CheerioCrawler Integration', () => {
     const x_proxy_caches: string[] = []
     const ids: number[] = []
 
-    const crawler = new CheerioCrawler({
+    const crawlerOptions = {
       preNavigationHooks: [hook],
-      requestHandler: async ({ body, response }) => {
+      requestHandler: async ({ body, response }: any) => {
         const data = JSON.parse(body.toString());
         ids.push(data.id);
         x_proxy_caches.push(response.headers?.['x-proxy-cache'] as string);
       },
-    }, new Configuration({
-      storageClientOptions: {
-        localDataDirectory: ctx.storagePath,
-      },
-    }));
+    };
 
     // Request with ID 1
-    await crawler.run([{
+    const c1 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'post-1') },
+    }));
+    await c1.run([{
       url: `${server.address}/api/post`,
       method: 'POST',
       payload: JSON.stringify({ id: 1 }),
@@ -244,7 +266,10 @@ describe('CheerioCrawler Integration', () => {
     expect(server.requests.length).toBe(1);
 
     // Request with ID 2 (different payload, same URL)
-    await crawler.run([{
+    const c2 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'post-2') },
+    }));
+    await c2.run([{
       url: `${server.address}/api/post`,
       method: 'POST',
       payload: JSON.stringify({ id: 2 }),
@@ -254,7 +279,10 @@ describe('CheerioCrawler Integration', () => {
     expect(server.requests.length).toBe(2); // Should be MISS again
 
     // Repeat Request with ID 1 (should HIT)
-    await crawler.run([{
+    const c3 = new CheerioCrawler(crawlerOptions, new Configuration({
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'post-3') },
+    }));
+    await c3.run([{
       url: `${server.address}/api/post`,
       method: 'POST',
       payload: JSON.stringify({ id: 1 }),
@@ -264,5 +292,78 @@ describe('CheerioCrawler Integration', () => {
     expect(server.requests.length).toBe(2); // No new server request
     expect(x_proxy_caches).toStrictEqual(['MISS', 'MISS', 'HIT']);
     expect(ids).toStrictEqual([1, 2, 1]);
+  });
+
+  it('should cache multiple calls in the same session via sendRequest', async () => {
+    const { server, cache, config, activeCacheWrites, awaitCache } = ctx;
+
+    server.setHandler('/main', async (req, res) => {
+      res.header('Cache-Control', 'public, max-age=3600');
+      res.header('Expires', new Date(Date.now() + 3600000).toUTCString());
+      return { message: 'main' };
+    });
+
+    server.setHandler('/secondary', async (req, res) => {
+      res.header('Cache-Control', 'public, max-age=3600');
+      res.header('Expires', new Date(Date.now() + 3600000).toUTCString());
+      return { message: 'secondary' };
+    });
+
+    const hook = createCrawleeCacheHook({
+      cache,
+      config: {
+        ...config,
+        forceCache: true,
+      },
+      activeCacheWrites,
+      backgroundUpdate: false
+    });
+    const results: any[] = [];
+
+    const crawlerOptions = {
+      preNavigationHooks: [hook],
+      requestHandler: async ({ body, response, sendRequest }: any) => {
+        const mainData = JSON.parse(body.toString());
+        const mainCache = response.headers?.['x-proxy-cache'];
+
+        const secondaryRes = await sendRequest({ url: `${server.address}/secondary` });
+        const secondaryData = JSON.parse(secondaryRes.body.toString());
+        const secondaryCache = secondaryRes.headers?.['x-proxy-cache'];
+
+        results.push({
+          main: { data: mainData, cache: mainCache },
+          secondary: { data: secondaryData, cache: secondaryCache }
+        });
+      },
+    };
+
+    // First run: MISS
+    const crawler1 = new CheerioCrawler(crawlerOptions, new Configuration({
+      persistStorage: false,
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'run-1') },
+    }));
+    await crawler1.run([`${server.address}/main`]);
+    await awaitCache();
+    // wait sometime
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    // Second run: Use a DIFFERENT directory so Crawlee doesn't skip the URL
+    const crawler2 = new CheerioCrawler(crawlerOptions, new Configuration({
+      persistStorage: false,
+      storageClientOptions: { localDataDirectory: path.join(ctx.storagePath, 'run-2') },
+    }));
+    await crawler2.run([`${server.address}/main`]);
+
+    expect(results).toHaveLength(2);
+    // First run results
+    expect(results[0].main.cache).toBe('MISS');
+    expect(results[0].secondary.cache).toBe('MISS');
+
+    // Second run results
+    expect(results[1].main.cache).toBe('HIT');
+    expect(['HIT', 'STALE']).toContain(results[1].secondary.cache);
+
+    expect(server.requests.filter(r => r.url === '/main')).toHaveLength(1);
+    expect(server.requests.filter(r => r.url === '/secondary')).toHaveLength(1);
   });
 });

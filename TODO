@@ -1,3 +1,98 @@
 feat:
   ☐ 暂不支持 Puppeteer.
     - 理由: Puppeteer 没有 `route.fetch` (类似于 Playwright 的功能), 使用 `setRequestInterception` 拦截并模拟请求时非常容易陷入死循环, 且难以优雅地实现与 Playwright 一致的缓存拦截逻辑.
+refactor:
+  ☐ HttpCrawler 背后用的是 `got`(但是我听说crawlee 要废弃 `got`):
+
+  const instance = got.extend({
+	  request: (url, options: IncomingMessage, callback) => {
+		  return getCachedResponse(url, options);
+	  }
+  });
+  或者
+  const instance = got.extend({
+    hooks: {
+      beforeRequest: [
+        options => {
+          return getCachedResponse(options.url, options);
+        }
+      ]
+    }
+  });
+  const getCachedResponse = (url, options) => {
+    const response = new Readable({
+      read() {
+        this.push("Hello, world!");
+        this.push(null);
+      }
+    });
+
+    response.statusCode = 200;
+    response.headers = {};
+    response.trailers = {};
+    response.socket = null;
+    response.aborted = false;
+    response.complete = true;
+    response.httpVersion = '1.1';
+    response.httpVersionMinor = 1;
+    response.httpVersionMajor = 1;
+
+    return response;
+  };
+
+  但是内部它早就扩展了：
+  const gotScraping = originalGot.extend({
+    handlers,
+    mutableDefaults: true,
+    // Most of the new browsers use HTTP/2
+    http2: true,
+    https: {
+        // In contrast to browsers, we don't usually do login operations.
+        // We want the content.
+        rejectUnauthorized: false,
+    },
+    // Don't fail on 404
+    throwHttpErrors: false,
+    timeout: { request: 60_000 },
+    retry: { limit: 0 },
+    headers: {
+        'user-agent': undefined,
+    },
+    context: {
+        headerGenerator: new HeaderGenerator(),
+        useHeaderGenerator: true,
+        insecureHTTPParser: true,
+    },
+    agent: {
+        http: new TransformHeadersAgent(http.globalAgent),
+        https: new TransformHeadersAgent(https.globalAgent),
+    },
+    hooks: {
+        init,
+        beforeRequest: beforeRequest as never,
+        beforeRedirect,
+    },
+  }) as GotScraping;
+
+  不过它把这个数组暴露出去了
+  const beforeRequest = [
+    insecureParserHook,
+    sessionDataHook,
+    http2Hook,
+    proxyHook,
+    browserHeadersHook,
+    tlsHook,
+  ];
+
+  还有一个方法是
+  const map = new Map();
+
+  let response = await got('https://sindresorhus.com', {cache: map});
+  console.log(response.isFromCache);
+  //=> false
+
+  response = await got('https://sindresorhus.com', {cache: map});
+  console.log(response.isFromCache);
+  //=> true
+
+   Keyv 也就是用的 map 的 API !

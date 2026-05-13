@@ -105,7 +105,7 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
     } else if (crawler && !(crawler as any)._proxyWrapped) {
       // --- 场景 B: HTTP 引擎 (CheerioCrawler/JSDOMCrawler) ---
-      setupHttpCrawlerCache(crawler, options);
+      setupHttpCrawlerCache(crawler, options, fetchWithCacheBound);
     }
   };
 }

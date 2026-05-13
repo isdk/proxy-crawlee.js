@@ -5,7 +5,7 @@ export function crawleeToWebRequest(request: any): Request {
   const url = typeof request.url === 'function' ? request.url() : request.url;
   const method = typeof request.method === 'function' ? request.method() : request.method;
   const headers = typeof request.headers === 'function' ? request.headers() : request.headers;
-  const payload = typeof request.postData === 'function' ? request.postData() : (request.payload || request.postData);
+  const payload = typeof request.postData === 'function' ? request.postData() : (request.payload || request.postData || request.body);
   
   const options: RequestInit = {
     method: method || 'GET',
@@ -13,7 +13,11 @@ export function crawleeToWebRequest(request: any): Request {
   };
 
   if (payload && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-    options.body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    if (typeof payload === 'string' || payload instanceof Buffer || payload instanceof Uint8Array) {
+      options.body = payload;
+    } else {
+      options.body = JSON.stringify(payload);
+    }
   }
 
   return new Request(url, options);
