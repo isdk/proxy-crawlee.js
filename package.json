@@ -1,6 +1,6 @@
 {
   "name": "@isdk/proxy-crawlee",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Crawlee interceptor adapter for @isdk/proxy, providing a seamless caching layer for network requests.",
   "license": "MIT",
   "author": "Riceball LEE <snowyu.lee@gmail.com>",
