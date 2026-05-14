@@ -6,7 +6,7 @@
 
 # Interface: CrawleeContext
 
-Defined in: [types.ts:30](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L30)
+Defined in: [types.ts:30](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L30)
 
 内部使用的影子类型，避免直接依赖 Crawlee 核心包
 
@@ -16,7 +16,7 @@ Defined in: [types.ts:30](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > `optional` **browserContext**: `any`
 
-Defined in: [types.ts:36](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L36)
+Defined in: [types.ts:36](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L36)
 
 ***
 
@@ -24,7 +24,7 @@ Defined in: [types.ts:36](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > `optional` **crawler**: `any`
 
-Defined in: [types.ts:32](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L32)
+Defined in: [types.ts:32](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L32)
 
 ***
 
@@ -32,7 +32,7 @@ Defined in: [types.ts:32](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > `optional` **gotOptions**: `any`
 
-Defined in: [types.ts:38](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L38)
+Defined in: [types.ts:38](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L38)
 
 ***
 
@@ -40,7 +40,7 @@ Defined in: [types.ts:38](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > `optional` **log**: `any`
 
-Defined in: [types.ts:33](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L33)
+Defined in: [types.ts:33](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L33)
 
 ***
 
@@ -48,7 +48,7 @@ Defined in: [types.ts:33](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > `optional` **page**: `any`
 
-Defined in: [types.ts:35](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L35)
+Defined in: [types.ts:35](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L35)
 
 ***
 
@@ -56,7 +56,7 @@ Defined in: [types.ts:35](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > **request**: `any`
 
-Defined in: [types.ts:31](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L31)
+Defined in: [types.ts:31](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L31)
 
 ***
 
@@ -64,4 +64,4 @@ Defined in: [types.ts:31](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc
 
 > **sendRequest**: `any`
 
-Defined in: [types.ts:39](https://github.com/isdk/proxy-crawlee.js/blob/e4dc2edc321b769a5d2322f1c502e87ea69353df/src/types.ts#L39)
+Defined in: [types.ts:39](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L39)

@@ -73,6 +73,22 @@ The adapter injects a custom handler into `gotOptions.handlers`. It intercepts t
 
 The adapter uses `page.route` (Playwright) to intercept navigation requests. It fulfills the request directly from the cache, bypassing the browser's network stack for the main document.
 
+## Offline Mode
+
+**Offline Mode**: Disables network access and only uses the local cache. When a cache miss occurs, the crawler will throw `OfflineCacheMissError`.
+
+For this error to properly fail your crawler, you must configure `throwHttpErrors: true` in your Crawlee options:
+
+```typescript
+const crawler = new CheerioCrawler({
+  preNavigationHooks: [ cacheHook ],
+  requestHandler: async ({ request, body }) => {
+    console.log(`Fetched ${request.url}`);
+  },
+  throwHttpErrors: true, // Required for OfflineCacheMissError
+});
+```
+
 ## License
 
 MIT
