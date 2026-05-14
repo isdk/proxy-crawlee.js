@@ -76,6 +76,22 @@ await crawler.run(['https://example.com']);
 
 适配器利用 `page.route` (Playwright) 拦截请求。通过将主文档请求重定向到 `fetchWithCache` 逻辑中，实现从缓存直接 `fulfill` 页面内容，绕过浏览器的网络栈。
 
+## 离线模式 (Offline Mode)
+
+**离线模式**：禁止访问网络，只使用本地缓存。当缓存未命中时，爬虫将抛出 `OfflineCacheMissError`。
+
+若希望此错误能正确中止爬虫运行，必须在 Crawlee 配置中设置 `throwHttpErrors: true`：
+
+```typescript
+const crawler = new CheerioCrawler({
+  preNavigationHooks: [ cacheHook ],
+  requestHandler: async ({ request, body }) => {
+    console.log(`已抓取: ${request.url}`);
+  },
+  throwHttpErrors: true, // 抛出 OfflineCacheMissError 所需的配置
+});
+```
+
 ## 许可证
 
 MIT
