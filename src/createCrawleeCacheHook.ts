@@ -1,5 +1,5 @@
 import { debug as debugFactory } from 'debug';
-import { createFetchWithCache, OfflineCacheMissErrorCode } from '@isdk/proxy';
+import { createFetchWithCache } from '@isdk/proxy';
 import { CrawleeCacheOptions, CrawleeContext } from './types';
 import { crawleeToWebRequest } from './crawleeToWebRequest';
 import { webResponseToFulfill } from './webResponseToFulfill';
@@ -89,7 +89,6 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
           const fulfillOptions = await webResponseToFulfill(response);
           return route.fulfill(fulfillOptions);
         } catch (error: any) {
-          if (config.offline && error.code === OfflineCacheMissErrorCode) { throw error }
           debug('Cache interception failed for browser, continuing: %o', error);
           try {
             return route.continue();
