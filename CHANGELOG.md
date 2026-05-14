@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.3.0](https://github.com/isdk/proxy-crawlee.js/compare/v0.2.0...v0.3.0) (2026-05-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* follow upstream @isdk/proxy@0.3: offline 模式下缓存未命中改为返回 Response 而非抛出错误
+
+### Bug Fixes
+
+* **playwright:** should rethrow OfflineCacheMissError in offline mode ([81f9cce](https://github.com/isdk/proxy-crawlee.js/commit/81f9cce1bee7a6b452cea0b61beb9aaa5a0c7b1d))
+
+
+### Refactor
+
+* follow upstream @isdk/proxy@0.3: offline 模式下缓存未命中改为返回 Response 而非抛出错误 ([be04cca](https://github.com/isdk/proxy-crawlee.js/commit/be04cca1b979eb306ac7188ee39287f3a8d67fa6))
+
 ## 0.2.0 (2026-05-13)
 
 
