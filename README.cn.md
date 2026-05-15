@@ -36,10 +36,10 @@ const cache = new SmartCache({
 
 // 2. 创建缓存 Hook
 const cacheHook = createCrawleeCacheHook({
-  cache,
+  cache, // SmartCache 实例
   config: {
     // 默认对所有 GET 请求开启强制缓存
-    default: { methods: ['GET'], forceCache: true }
+    methods: ['GET'], forceCache: true
   }
 });
 
@@ -57,12 +57,15 @@ await crawler.run(['https://example.com']);
 
 ## 配置项详解 (CrawleeCacheOptions)
 
+`CrawleeCacheOptions` 继承自 `@isdk/proxy` 的 `FetchWithCacheOptions`，可以使用其所有选项，同时支持以下额外配置：
+
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `cache` | `SmartCache` | **必填**。来自 `@isdk/proxy` 的 SmartCache 实例。 |
-| `config` | `ProxySiteConfig` | **必填**。来自 `@isdk/proxy` 的缓存策略配置（如 `methods`, `rules`, `forceCache` 等）。 |
+| `cache` | `SmartCache` | **必填** 来自 `@isdk/proxy` 的 SmartCache 实例。  (**来自 `FetchWithCacheOptions`**)  |
+| `config` | `ProxySiteConfig` | **必填** 站点级缓存策略配置（如 `methods`、`rules`、`forceCache` 等）。详细配置请参阅 `@isdk/proxy`。  (**来自 `FetchWithCacheOptions`**) |
 | `fetcher` | `Function` | 可选。自定义真实网络请求函数。默认为内置的 `got-scraping` 封装。 |
-| `backgroundUpdate` | `boolean` | 是否启用 SWR 后台异步更新。默认：`true`。 |
+| `backgroundUpdate` | `boolean` | 是否启用 SWR 后台异步更新。默认：`true`。 (**来自 `FetchWithCacheOptions`**) |
+| `refresh` | `boolean` | **强制刷新**：忽略现有缓存（即使命中且新鲜也会回源），若回源拿到合法数据则自动更新并"愈合"缓存。常用于配合真人验证进行"穿透"。 (**来自 `FetchWithCacheOptions`**) |
 | `navigationOnly` | `boolean` | 是否仅缓存主文档导航请求（仅对浏览器引擎生效）。默认：`true`。 |
 | `activeCacheWrites` | `Map` | 可选。用于跨 Crawler 实例共享并发写入状态，防止重复下载。 |
 
