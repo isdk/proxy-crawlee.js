@@ -17,8 +17,6 @@ export function setupHttpCrawlerCache(crawler: any, options: CrawleeCacheOptions
   (crawler as any)._proxyWrapped = true;
 
   const {
-    cache,
-    config,
     backgroundUpdate = true,
   } = options;
 
@@ -41,7 +39,7 @@ export function setupHttpCrawlerCache(crawler: any, options: CrawleeCacheOptions
         const gotRes = await originalRequestFunction(opts);
         return gotResponseToWebResponse(gotRes);
       },
-      { cache, config, backgroundUpdate }
+      { ...options, backgroundUpdate }
     ).then(async (webRes: any) => {
       // 容错：如果 webRes.url 依然为空，则从请求中恢复
       if (!webRes.url || webRes.url === '') {
@@ -79,7 +77,7 @@ export function setupHttpCrawlerCache(crawler: any, options: CrawleeCacheOptions
           const gotRes = await originalSendRequest(requestOpts);
           return gotResponseToWebResponse(gotRes);
         },
-        { cache, config, backgroundUpdate }
+        { ...options, backgroundUpdate }
       ).then(async (webRes: any) => {
         debug('Cache Result (sendRequest) for %s: %s', webRes.url, webRes.headers.get('x-proxy-cache'));
         return await webResponseToGotResponse(webRes);

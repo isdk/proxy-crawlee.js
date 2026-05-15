@@ -19,8 +19,6 @@ const INTERCEPTED_PAGES = new WeakSet<any>();
  */
 export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
   const {
-    cache,
-    config,
     backgroundUpdate = true,
     navigationOnly = true,
     activeCacheWrites = new Map<string, Promise<void>>()
@@ -83,7 +81,7 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
               return defaultFetcher(innerReq);
             },
-            { cache, config, backgroundUpdate }
+            { ...options, backgroundUpdate }
           );
 
           const fulfillOptions = await webResponseToFulfill(response);

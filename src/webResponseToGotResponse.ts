@@ -22,7 +22,9 @@ export async function webResponseToGotResponse(webRes: Response): Promise<any> {
     headers,
     body: buffer,
     rawBody: buffer,
-    isFromCache: !!webRes.headers.get('x-proxy-cache') && webRes.headers.get('x-proxy-cache') !== 'MISS',
+    // 命中缓存：HIT, OFFLINE_HIT, STALE, STALE_IF_ERROR, STALE_RESCUE_*
+    isFromCache: /^(HIT|OFFLINE_HIT|STALE)/.test(webRes.headers.get('x-proxy-cache') || ''),
+    cache: webRes.headers.get('x-proxy-cache'),
   });
 
   return stream;
