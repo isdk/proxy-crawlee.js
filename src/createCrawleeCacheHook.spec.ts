@@ -564,7 +564,7 @@ describe('createCrawleeCacheHook', () => {
     await hook(context1 as any);
     const res1 = await mockCrawler1._requestFunction({ request: context1.request });
     expect(res1.isFromCache).toBeFalsy();
-    expect(res1.headers['x-proxy-cache']).toBeUndefined(); // 根本没进入缓存流程
+    expect(res1.headers['x-proxy-cache']).toBe('MISS_EXCLUDED_REQUEST'); // 根本没进入缓存流程
 
     // 请求 /api/user (应缓存)
     const mockCrawler2 = { _requestFunction: mockOriginalRequest };
