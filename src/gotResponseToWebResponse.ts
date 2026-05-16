@@ -15,6 +15,8 @@ export function gotResponseToWebResponse(gotRes: any): Response {
   const headers = new Headers();
   if (gotRes.headers) {
     for (const [key, value] of Object.entries(gotRes.headers)) {
+      // skip HTTP/2 pseudo-headers
+      if (key.startsWith(':')) { continue }
       if (Array.isArray(value)) {
         value.forEach(v => headers.append(key, v));
       } else if (value !== undefined && value !== null) {
@@ -52,6 +54,8 @@ function parseHeaders(rawHeaders: string[] | undefined, existingHeaders?: Header
     // 步长为 2 遍历数组
     for (let i = 0; i < rawHeaders.length; i += 2) {
         const key = rawHeaders[i];
+        // skip HTTP/2 pseudo-headers
+        if (key.startsWith(':')) { continue }
         const value = rawHeaders[i + 1];
 
         // 使用 append 确保多次出现的相同 Key（如 set-cookie）不会被覆盖，而是合法追加
