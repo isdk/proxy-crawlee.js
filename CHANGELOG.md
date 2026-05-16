@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.3.1](https://github.com/isdk/proxy-crawlee.js/compare/v0.3.0...v0.3.1) (2026-05-16)
+
+
+### Refactor
+
+* 优化 CrawleeCacheOptions 接口，继承 FetchWithCacheOptions 并简化参数传递 ([61002de](https://github.com/isdk/proxy-crawlee.js/commit/61002de4df4f551fa1f1d8a92cec895352511ca3))
+
 ## [0.3.0](https://github.com/isdk/proxy-crawlee.js/compare/v0.2.0...v0.3.0) (2026-05-14)
 
 
