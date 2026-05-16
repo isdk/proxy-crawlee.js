@@ -8,7 +8,7 @@
 
 > **createCrawleeCacheHook**(`options`): (`context`, `secondArg?`) => `Promise`\<`void`\>
 
-Defined in: [createCrawleeCacheHook.ts:20](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/createCrawleeCacheHook.ts#L20)
+Defined in: [proxy-crawlee/src/createCrawleeCacheHook.ts:20](https://github.com/isdk/proxy-crawlee.js/blob/70a84cf65b1c2e2ebbe6bc6887e30e49f3ba1230/src/createCrawleeCacheHook.ts#L20)
 
 创建一个通用的 Crawlee 缓存钩子，可用于 preNavigationHooks。
 

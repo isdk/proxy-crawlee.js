@@ -8,7 +8,7 @@
 
 > **crawleeToWebRequest**(`request`): `Request`
 
-Defined in: [crawleeToWebRequest.ts:4](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/crawleeToWebRequest.ts#L4)
+Defined in: [proxy-crawlee/src/crawleeToWebRequest.ts:4](https://github.com/isdk/proxy-crawlee.js/blob/70a84cf65b1c2e2ebbe6bc6887e30e49f3ba1230/src/crawleeToWebRequest.ts#L4)
 
 将 Crawlee 的 Request 对象或浏览器 (Playwright) 的 Request 对象转换为标准的 Web Request
 

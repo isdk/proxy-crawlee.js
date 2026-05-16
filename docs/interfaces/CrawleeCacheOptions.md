@@ -6,9 +6,13 @@
 
 # Interface: CrawleeCacheOptions
 
-Defined in: [types.ts:6](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L6)
+Defined in: [proxy-crawlee/src/types.ts:6](https://github.com/isdk/proxy-crawlee.js/blob/70a84cf65b1c2e2ebbe6bc6887e30e49f3ba1230/src/types.ts#L6)
 
 Crawlee 缓存适配器配置选项
+
+## Extends
+
+- `FetchWithCacheOptions`
 
 ## Properties
 
@@ -16,9 +20,13 @@ Crawlee 缓存适配器配置选项
 
 > `optional` **activeCacheWrites**: `Map`\<`string`, `Promise`\<`void`\>\>
 
-Defined in: [types.ts:24](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L24)
+Defined in: proxy/dist/index.d.ts:549
 
 并发写入任务追踪器
+
+#### Inherited from
+
+`FetchWithCacheOptions.activeCacheWrites`
 
 ***
 
@@ -26,9 +34,13 @@ Defined in: [types.ts:24](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1
 
 > `optional` **backgroundUpdate**: `boolean`
 
-Defined in: [types.ts:17](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L17)
+Defined in: proxy/dist/index.d.ts:539
 
-是否开启后台异步更新 (SWR)
+是否启用后台异步更新 (SWR)
+
+#### Inherited from
+
+`FetchWithCacheOptions.backgroundUpdate`
 
 ***
 
@@ -36,9 +48,13 @@ Defined in: [types.ts:17](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1
 
 > **cache**: `SmartCache`
 
-Defined in: [types.ts:8](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L8)
+Defined in: proxy/dist/index.d.ts:535
 
-SmartCache 实例
+混合缓存实例
+
+#### Inherited from
+
+`FetchWithCacheOptions.cache`
 
 ***
 
@@ -46,9 +62,13 @@ SmartCache 实例
 
 > **config**: `ProxySiteConfig`
 
-Defined in: [types.ts:10](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L10)
+Defined in: proxy/dist/index.d.ts:537
 
-站点级缓存配置
+站点级基础配置
+
+#### Inherited from
+
+`FetchWithCacheOptions.config`
 
 ***
 
@@ -56,7 +76,7 @@ Defined in: [types.ts:10](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1
 
 > `optional` **fetcher**: (`request`) => `Promise`\<`Response`\>
 
-Defined in: [types.ts:15](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L15)
+Defined in: [proxy-crawlee/src/types.ts:11](https://github.com/isdk/proxy-crawlee.js/blob/70a84cf65b1c2e2ebbe6bc6887e30e49f3ba1230/src/types.ts#L11)
 
 自定义 Fetcher。
 如果不提供，且在 HTTP 环境下，将默认尝试使用 `got-scraping`。
@@ -73,11 +93,109 @@ Defined in: [types.ts:15](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1
 
 ***
 
+### generateKey()?
+
+> `optional` **generateKey**: (`req`, `siteConfig`, `bodyState?`, `effectiveConfig?`) => `Promise`\<`string`\>
+
+Defined in: proxy/dist/index.d.ts:545
+
+自定义缓存键生成函数
+
+根据 Request 对象和配置生成唯一的缓存指纹 (异步)
+
+#### Parameters
+
+##### req
+
+`Request`
+
+请求对象
+
+##### siteConfig
+
+`ProxySiteConfig`
+
+站点级配置
+
+##### bodyState?
+
+可选的 Body 读取状态（用于性能优化，避免重复读取）
+
+###### checked
+
+`boolean`
+
+###### json?
+
+`any`
+
+###### limit
+
+`number`
+
+###### text
+
+`string` \| `null`
+
+##### effectiveConfig?
+
+`ProxyCacheRule`
+
+可选的最终生效配置（用于性能优化，避免重复合并）
+
+#### Returns
+
+`Promise`\<`string`\>
+
+#### Inherited from
+
+`FetchWithCacheOptions.generateKey`
+
+***
+
 ### navigationOnly?
 
 > `optional` **navigationOnly**: `boolean`
 
-Defined in: [types.ts:22](https://github.com/isdk/proxy-crawlee.js/blob/be04cca1b979eb306ac7188ee39287f3a8d67fa6/src/types.ts#L22)
+Defined in: [proxy-crawlee/src/types.ts:16](https://github.com/isdk/proxy-crawlee.js/blob/70a84cf65b1c2e2ebbe6bc6887e30e49f3ba1230/src/types.ts#L16)
 
 是否只缓存主文档请求 (Navigation Requests)。
 仅对 Playwright 引擎生效。默认：true。
+
+***
+
+### onBackgroundUpdate()?
+
+> `optional` **onBackgroundUpdate**: (`promise`) => `void`
+
+Defined in: proxy/dist/index.d.ts:543
+
+后台更新 Promise 触发时的回调
+
+#### Parameters
+
+##### promise
+
+`Promise`\<`Response`\>
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+`FetchWithCacheOptions.onBackgroundUpdate`
+
+***
+
+### refresh?
+
+> `optional` **refresh**: `boolean`
+
+Defined in: proxy/dist/index.d.ts:541
+
+是否强制刷新缓存（跳过读取，但请求成功后会更新缓存）
+
+#### Inherited from
+
+`FetchWithCacheOptions.refresh`

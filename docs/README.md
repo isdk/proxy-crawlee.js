@@ -35,9 +35,9 @@ const cache = new SmartCache({ storagePath: './.cache' });
 
 // 2. Create the hook
 const cacheHook = createCrawleeCacheHook({
-  cache,
+  cache, // SmartCache instance
   config: {
-    default: { methods: ['GET'], forceCache: true }
+    methods: ['GET'], forceCache: true
   }
 });
 
@@ -54,12 +54,15 @@ await crawler.run(['https://example.com']);
 
 ## Configuration Options
 
+`CrawleeCacheOptions` extends `FetchWithCacheOptions` from `@isdk/proxy`. All options from `FetchWithCacheOptions` are available, plus the following:
+
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| `cache` | `SmartCache` | **Required**. The SmartCache instance from `@isdk/proxy`. |
-| `config` | `ProxySiteConfig` | **Required**. Cache rules and fingerprinting settings from `@isdk/proxy`. |
+| `cache` | `SmartCache` | **Required** (from `FetchWithCacheOptions`). The SmartCache instance from `@isdk/proxy`. |
+| `config` | `ProxySiteConfig` | **Required** (from `FetchWithCacheOptions`). Site-level cache configuration (rules, fingerprinting, etc.). For detailed options like `methods`, `rules`, `forceCache`, see `@isdk/proxy`. |
 | `fetcher` | `Function` | Optional. Custom fetcher for real network requests. Defaults to `got-scraping`. |
-| `backgroundUpdate` | `boolean` | Enable SWR (Stale-While-Revalidate). Default: `true`. |
+| `backgroundUpdate` | `boolean` | **From `FetchWithCacheOptions`**. Enable SWR (Stale-While-Revalidate). Default: `true`. |
+| `refresh` | `boolean` | **From `FetchWithCacheOptions`**. **Force refresh**: Ignores existing cache and always fetches from source. Useful for bypassing bot verification. |
 | `navigationOnly` | `boolean` | Only cache the main document (Browser only). Default: `true`. |
 | `activeCacheWrites` | `Map` | Shared map for request collapsing across crawler instances. |
 
