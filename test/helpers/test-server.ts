@@ -9,8 +9,8 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDJm2S6NqB/pYVj
 ... (rest of the key omitted for brevity, but I will provide a real-ish one if possible, or just a placeholder for now)
 `;
 
-// Actually, I'll generate one if I can, but let's just keep it simple with HTTP for now 
-// OR I can use a library if available. 
+// Actually, I'll generate one if I can, but let's just keep it simple with HTTP for now
+// OR I can use a library if available.
 // Since I can't easily generate a real PEM here without a library like 'selfsigned',
 // I will just add the infrastructure for HTTPS and explain it.
 
@@ -52,7 +52,9 @@ export async function createTestServer(options: TestServerOptions = {}): Promise
 
   const app = Fastify(fastifyOptions);
 
-  app.addHook('onRequest', async (req) => {
+  // 使用 preHandler 而非 onRequest，因为 onRequest 在 body 解析之前触发，
+  // 此时 req.body 还是 undefined，导致 POST body 无法被记录用于测试断言。
+  app.addHook('preHandler', async (req) => {
     requests.push({
       url: req.url,
       method: req.method,
@@ -65,7 +67,7 @@ export async function createTestServer(options: TestServerOptions = {}): Promise
     const url = new URL(req.url, 'http://localhost');
     const handler = handlers.get(url.pathname);
     if (handler) {
-      return handler(req, reply);
+      return handler(req as any, reply as any);
     }
     return { status: 'ok', url: req.url };
   });

@@ -32,24 +32,40 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
 
     if (page) {
       // --- 场景 A: 浏览器引擎 (Playwright) ---
-      // 确保每个页面只设置一次拦截，避免重复注册导致的内存泄漏和逻辑混乱
-      if (INTERCEPTED_PAGES.has(page)) {
+      // 确保每个页面只设置一次拦截，避免重复注册导致的内存泄漏和嵌套路由死循环
+      // 使用 page 对象上的专属标记，防止因模块被多次加载 (CJS/ESM) 导致的 WeakSet 失效
+      if ((page as any).__isdkProxyIntercepted || INTERCEPTED_PAGES.has(page)) {
         return;
       }
+      (page as any).__isdkProxyIntercepted = true;
       INTERCEPTED_PAGES.add(page);
 
       debug('Setting up browser cache interception for page');
+
+      // 追踪当前正在被 route.fetch() 处理中的请求，用于阻断 Playwright 路由递归。
+      // key 使用 @isdk/proxy 通过 this.cacheKey 提供的精确哈希值（包含 method+url+body 等指纹）。
+      const inFlightFetches = new Set<string>();
 
       const interceptor = async (route: any) => {
         try {
           const req = route.request();
           const url = req.url();
+          const method = req.method();
+          const resourceType = req.resourceType();
+
+          debug('Intercept: %s %s | Type: %s', method, url, resourceType);
+
+          // 避免 Service Worker 导致的 route.fetch() 递归循环 (Service Worker 发起的请求 frame 为 null)
+          if (!req.frame()) {
+            debug('Skipping request from Service Worker (no frame): %s', url);
+            return typeof route.fallback === 'function' ? route.fallback() : route.continue();
+          }
 
           const isNavigation = req.isNavigationRequest();
 
           if (navigationOnly && !isNavigation) {
             debug('Skipping non-navigation request: %s', url);
-            return route.continue();
+            return typeof route.fallback === 'function' ? route.fallback() : route.continue();
           }
 
           debug('Intercepting request: %s', url);
@@ -57,17 +73,39 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
           const webReq = crawleeToWebRequest(req);
           const response = await fetchWithCacheBound(
             webReq,
-            async (innerReq) => {
-              if (options.fetcher) return options.fetcher(innerReq);
+            // 必须使用普通函数（非箭头函数），以便通过 this 接收 @isdk/proxy 传入的缓存上下文
+            // this.cacheKey: 由 proxy 核心计算的精确哈希（包含 method、url、body 等指纹）
+            async function (this: any, innerReq: Request) {
+              if (options.fetcher) return options.fetcher.call(this, innerReq);
 
-              // 如果是 Playwright 环境，优先使用 route.fetch() 以前往真实网络抓取内容
-              // 这样可以复用浏览器的上下文（Cookie、会话等）
+              // 如果是 Playwright 环境，优先使用 route.fetch() 以复用浏览器上下文（Cookie、会话等）
               if (typeof route.fetch === 'function') {
+                const cacheKey = this?.cacheKey;
+
+                // 【核心防递归机制】
+                // Playwright 的 route.fetch() 在处理 POST 请求时，会将请求重新投递回
+                // 路由拦截管线，导致同一个 page.route('**/*') 拦截器再次被触发，形成死循环。
+                // 通过 inFlightFetches Set 追踪正在处理中的请求：如果当前 cacheKey 已在 Set 中，
+                // 说明这是 route.fetch() 触发的递归拦截，降级到 Node.js defaultFetcher 直接发起
+                // 网络请求，从而彻底阻断递归。
+                if (cacheKey && inFlightFetches.has(cacheKey)) {
+                  debug('Detected route.fetch() recursion (cacheKey: %s), falling back to Node fetcher: %s', cacheKey, innerReq.url);
+                  return defaultFetcher(innerReq);
+                }
+
+                if (cacheKey) {
+                  inFlightFetches.add(cacheKey);
+                }
                 try {
                   debug('Using Playwright route.fetch() for: %s', innerReq.url);
                   const playwrightRes = await route.fetch();
+                  debug('Playwright route.fetch() success: %s (Status: %s)', innerReq.url, playwrightRes.status());
                   const headers = playwrightRes.headers();
-                  // 移除一些可能导致冲突的 hop-by-hop 头部（可选，但通常 Playwright 会处理）
+                  // Playwright 的 route.fetch() 会自动解压 (decompress) 响应体，
+                  // 所以获取到的 body 已经是明文。如果原封不动地把 content-encoding (如 gzip)
+                  // 和 content-length 塞回给浏览器，浏览器网络层在解压明文时会崩溃或永久挂起，导致页面卡死！
+                  delete headers['content-encoding'];
+                  delete headers['content-length'];
 
                   return new Response(await playwrightRes.body(), {
                     status: playwrightRes.status(),
@@ -76,6 +114,10 @@ export function createCrawleeCacheHook(options: CrawleeCacheOptions) {
                   });
                 } catch (e) {
                   debug('Playwright route.fetch() failed, falling back to default fetcher: %o', e);
+                } finally {
+                  if (cacheKey) {
+                    inFlightFetches.delete(cacheKey);
+                  }
                 }
               }
 
