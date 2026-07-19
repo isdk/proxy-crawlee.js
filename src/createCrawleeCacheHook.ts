@@ -1,5 +1,4 @@
-import { debug as debugFactory } from 'debug';
-import { createFetchWithCache } from '@isdk/proxy';
+import { createFetchWithCache, debug as debugFactory } from '@isdk/proxy';
 import { CrawleeCacheOptions, CrawleeContext } from './types';
 import { crawleeToWebRequest } from './crawleeToWebRequest';
 import { webResponseToFulfill } from './webResponseToFulfill';

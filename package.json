@@ -35,9 +35,6 @@
     "release": "pnpm run clean && pnpm run build && git add -f docs && git ci -m 'docs: update API docs' && pnpm dlx commit-and-tag-version -s",
     "release.alpha": "pnpm run release -- --prerelease alpha"
   },
-  "dependencies": {
-    "debug": "^4.4.3"
-  },
   "peerDependencies": {
     "@isdk/proxy": ">=0.2",
     "crawlee": "^3.16"
@@ -50,7 +47,6 @@
     "@fastify/formbody": "^8.0.2",
     "@isdk/proxy": "workspace:^",
     "@types/cacache": "^20.0.1",
-    "@types/debug": "^4.1.13",
     "@types/http-cache-semantics": "^4.2.0",
     "@types/jest": "^29.5.14",
     "@types/jsdom": "^27.0.0",

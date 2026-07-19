@@ -1,5 +1,4 @@
-import { debug as debugFactory } from 'debug';
-import { createResponse } from '@isdk/proxy';
+import { createResponse, debug as debugFactory } from '@isdk/proxy';
 import { CrawleeCacheOptions } from './types';
 import { crawleeToWebRequest } from './crawleeToWebRequest';
 import { gotResponseToWebResponse } from './gotResponseToWebResponse';

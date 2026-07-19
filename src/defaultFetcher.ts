@@ -1,4 +1,4 @@
-import { debug as debugFactory } from 'debug';
+import { debug as debugFactory } from '@isdk/proxy';
 import { gotResponseToWebResponse } from './gotResponseToWebResponse';
 
 const debug = debugFactory('@isdk/proxy:adapters:crawlee:fetcher');
